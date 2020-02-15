@@ -33,10 +33,11 @@ net = Network('cmr_basic')
 net.initialize_basic_tcm(param, task.units_needed)
 
 # have param set, have network, have task identity
-task.ifr_trial_generate(net,param)
+# results, a list of integers
+results = task.ifr_trial_generate(net,param)
 
 # check the network, grab activation state of c
-print(net.c_layer.act_state)
+print(results)
 
 print('\n -+^ I did not crash ^+- \n')
 

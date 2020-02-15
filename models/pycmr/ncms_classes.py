@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.random as rn
 
 class Parameters:
     
@@ -62,18 +63,13 @@ class Task:
         # alternative/companion is ifr_trial_predict
         # assumes net is initialized
 
-        # task function for the study list presentation code (?)
+        # task function for the study list presentation code
         # because sometimes will want to run study list without recall period
         # for loop over list items / list length
         self.ifr_study_list(net, param)
 
-        # while loop over recall events 
-        stopped = False
-        while not stopped:
-            # prompt a recall
-            results = True
-            stopped = True
-            # results.
+        # task function for basic free recall period
+        results = self.ifr_recall_period(net, param)
         
         return results
 
@@ -82,28 +78,32 @@ class Task:
         self.serial_position = 1
 
         # initialize context by presenting 'start_item'
-        # using index = list_length + 1
-        # and beta = 1
+        # using index = list_length + 1 and beta = 1
         net.initialize_context(self)
-        
-        # print('here I am')
-        # print(self.item_list)
-        # this_list = []
-        # this_list.append(Item(''))
-        # print('here 2')
-        # self.item_list.append(Item('temp'))
-        
+                
         for i in range(self.list_length):
-            # make a generic item for now?
+            # make a generic item for now
             self.item_list.append(Item('generic'))
             self.item_list[-1].index = i
-            # task can keep track of serial position
-            net.present_item_basic_tcm(param, self) #self.item_list[-1])
+            # task keeps track of serial position
+            net.present_item_basic_tcm(param, self)
             self.serial_position += 1
- 
-            #net.present_item_basic_tcm(param, self.item_list[i])
-            #self.serial_position = i
+
+    def ifr_recall_period(self, net, param):
+        #
+        results = []
+        
+        # while loop over recall events 
+        stopped = False
+        while not stopped:
+            # prompt a recall
+            this_event = net.recall_attempt_basic_tcm(param, self)
+            results.append(this_event)
+            stopped = True
             
+        return results
+
+
 # allows item to act as a data struct
 class Item:
 
@@ -179,7 +179,6 @@ class Network:
         self.m_cf_exp.hebbian_learning(param.L+primacy_scaling)        
 
     def initialize_context(self, task):
-        print ('implement context initialization')
         self.c_layer.initialize_net_input_zeros()
         index = task.list_length
         self.f_layer.activate_unit_vector(index)
@@ -187,6 +186,12 @@ class Network:
         # integrate fully, beta = 1
         self.c_layer.integrate_net_input(1)
 
+    def recall_attempt_basic_tcm(self, param, task):
+        print('implement recall attempt basic tcm')
+        this_rnd = rn.rand()
+        print('random number: {0}'.format(this_rnd))
+        return this_rnd
+        
 class Layer:
     
     def __init__(self, name, n_units):
