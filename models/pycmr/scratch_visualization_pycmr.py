@@ -17,6 +17,7 @@ setattr(param, 'T', 1)
 
 task = Task('ifr_task')
 # task stores information about the immediate free recall task
+setattr(task, 'n_trials', 15)
 setattr(task, 'list_length', 10)
 setattr(task, 'pres_itemnos', np.array(range(task.list_length)))
 # specific to the unit vector style of item representations
@@ -30,12 +31,25 @@ net.initialize_basic_tcm(param, task.units_needed)
 # results, a list of integers
 # outcomes [0, LL) represent study items being recalled
 # outcome LL represents recall termination
+recalls = np.zeros((task.n_trials, task.list_length), dtype=int)
 
-results = task.ifr_trial_generate(net,param)
+for i in range(task.n_trials):
+    results = task.ifr_trial_generate(net,param)
+    these = np.array(results[:-1])
+    # print(type(these))
+    these = these + 1
+    # add +1 if we want recalls matrix to be in terms of serial position
+    recalls[i,:len(these)] = these
+    
+# data structure
+# recalls matrix, n trials by n recall events
+
 
 # check the network, grab activation state of c
 context_state = net.c_layer.act_state
-print(results)
+# print(results)
+print(recalls)
+
 
 print('\n -+^ I did not crash ^+- \n')
 

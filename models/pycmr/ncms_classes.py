@@ -93,6 +93,7 @@ class Task:
         #
         results = []
         self.recall_attempt = 1
+        self.recalled_items = []
         
         # while loop over recall events 
         stopped = False
@@ -194,8 +195,8 @@ class Network:
         # task can keep track of previous recalls
 
         # uniform sampling to get things going
-        # outcomes [0, LL) represent study items being recalled
-        # outcome LL represents recall termination
+        # outcomes [1, LL] represent serial pos of study items being recalled
+        # outcome LL+1 represents recall termination
 
         # calculate stop probability
         # fixed stop prob to get things going
@@ -203,10 +204,12 @@ class Network:
         
         outcomes = task.list_length+1
         prob_vec = np.ones(outcomes)
+        for i in range(len(task.recalled_items)):
+            prob_vec[task.recalled_items[i]] = 0
         prob_vec = prob_vec / np.sum(prob_vec)
         this_event = rn.choice(outcomes, 1, p=prob_vec)
-        print(this_event)
-        
+        task.recalled_items.append(this_event)
+        # print(this_event)
 
         return this_event
         #this_rnd = rn.rand()
