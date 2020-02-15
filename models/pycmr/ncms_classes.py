@@ -188,6 +188,15 @@ class Network:
 
     def recall_attempt_basic_tcm(self, param, task):
         print('implement recall attempt basic tcm')
+        # task can keep track of previous recalls
+
+        # uniform sampling to get things off the ground
+        # outcomes [0, LL) represent study items being recalled
+        # outcome LL represents recall termination
+        outcomes = task.list_length+1
+        this_event = rn.choice(outcomes, 1, prob_vec)
+        
+        # and stop prob
         this_rnd = rn.rand()
         print('random number: {0}'.format(this_rnd))
         return this_rnd
