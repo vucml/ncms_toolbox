@@ -56,14 +56,64 @@ class Task:
     def __init__(self, name):
         self.name = name
         self.stimulus_pool = []
+        self.item_list = []
 
-    def ifr_trial_generate(self, net):
-        # alternative would be ifr_trial_predict?
-        net.initialize_fn()
+    def ifr_trial_generate(self, net, param):
+        # alternative/companion is ifr_trial_predict
+        # assumes net is initialized
 
+        # task function for the study list presentation code (?)
+        # because sometimes will want to run study list without recall period
+        # for loop over list items / list length
+        self.ifr_study_list(net, param)
+
+        # while loop over recall events 
+        stopped = False
+        while not stopped:
+            # prompt a recall
+            results = True
+            stopped = True
+            # results.
+        
+        return results
+
+    def ifr_study_list(self, net, param):
+        #
+        self.serial_position = 1
+
+        # initialize context by presenting 'start_item'
+        # using index = list_length + 1
+        # and beta = 1
+        net.initialize_context(self)
+        
+        # print('here I am')
+        # print(self.item_list)
+        # this_list = []
+        # this_list.append(Item(''))
+        # print('here 2')
+        # self.item_list.append(Item('temp'))
+        
+        for i in range(self.list_length):
+            # make a generic item for now?
+            self.item_list.append(Item('generic'))
+            self.item_list[-1].index = i
+            # task can keep track of serial position
+            net.present_item_basic_tcm(param, self) #self.item_list[-1])
+            self.serial_position += 1
+ 
+            #net.present_item_basic_tcm(param, self.item_list[i])
+            #self.serial_position = i
+            
 # allows item to act as a data struct
 class Item:
-    pass
+
+    def __init__(self,name):
+        self.name = name
+        self.string = ''
+        self.word_pool_id = []
+        # index relates item to network when using unit vectors
+        self.index = []
+
 
 class Network:
 
@@ -109,10 +159,11 @@ class Network:
         m_cf_pre.init_matrix_identity(param.Dcf)
         # m_fc_exp has associated learning rule?        
 
-    def present_item_basic_tcm(self, param, env, item):
+    def present_item_basic_tcm(self, param, task):
         # get ready for the next simulated item by zeroing out net_input of c
         self.c_layer.initialize_net_input_zeros()
-        index = item.index
+        # when unit vector representations used, index tells which f unit to activate
+        index = task.item_list[-1].index
         self.f_layer.activate_unit_vector(index)
         # project activity uses projection to update net_input of to_layer
         self.m_fc_pre.project_activity()
@@ -122,10 +173,19 @@ class Network:
         # Hebbian learning on m_fc_exp 
         # for full cmr implementation, primacy scaling must be possible
         # will prob need environment to track serial position
-        primacy_scaling = (param.P1 * np.exp(-1 * param.P2 * (env.serial_position-1))) + 1
+        primacy_scaling = (param.P1 * np.exp(-1 * param.P2 * (task.serial_position-1))) + 1
         # primacy scaling modifies learning rate but just in the cf direction
         self.m_fc_exp.hebbian_learning(param.L)
         self.m_cf_exp.hebbian_learning(param.L+primacy_scaling)        
+
+    def initialize_context(self, task):
+        print ('implement context initialization')
+        self.c_layer.initialize_net_input_zeros()
+        index = task.list_length
+        self.f_layer.activate_unit_vector(index)
+        self.m_fc_pre.project_activity()
+        # integrate fully, beta = 1
+        self.c_layer.integrate_net_input(1)
 
 class Layer:
     
