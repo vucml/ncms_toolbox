@@ -92,14 +92,17 @@ class Task:
     def ifr_recall_period(self, net, param):
         #
         results = []
+        self.recall_attempt = 1
         
         # while loop over recall events 
         stopped = False
         while not stopped:
             # prompt a recall
             this_event = net.recall_attempt_basic_tcm(param, self)
-            results.append(this_event)
-            stopped = True
+            results.append(this_event[0])
+            # check if it was a stop event
+            if this_event==self.list_length:
+                stopped = True
             
         return results
 
@@ -187,19 +190,28 @@ class Network:
         self.c_layer.integrate_net_input(1)
 
     def recall_attempt_basic_tcm(self, param, task):
-        print('implement recall attempt basic tcm')
+        # print('implement recall attempt basic tcm')
         # task can keep track of previous recalls
 
-        # uniform sampling to get things off the ground
+        # uniform sampling to get things going
         # outcomes [0, LL) represent study items being recalled
         # outcome LL represents recall termination
-        outcomes = task.list_length+1
-        this_event = rn.choice(outcomes, 1, prob_vec)
+
+        # calculate stop probability
+        # fixed stop prob to get things going
+        # can check param to see what the stop rule is
         
-        # and stop prob
-        this_rnd = rn.rand()
-        print('random number: {0}'.format(this_rnd))
-        return this_rnd
+        outcomes = task.list_length+1
+        prob_vec = np.ones(outcomes)
+        prob_vec = prob_vec / np.sum(prob_vec)
+        this_event = rn.choice(outcomes, 1, p=prob_vec)
+        print(this_event)
+        
+
+        return this_event
+        #this_rnd = rn.rand()
+        #print('random number: {0}'.format(this_rnd))
+        #return this_rnd
         
 class Layer:
     

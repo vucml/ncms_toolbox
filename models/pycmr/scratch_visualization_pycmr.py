@@ -17,7 +17,7 @@ setattr(param, 'T', 1)
 
 task = Task('ifr_task')
 # task stores information about the immediate free recall task
-setattr(task, 'list_length', 20)
+setattr(task, 'list_length', 10)
 setattr(task, 'pres_itemnos', np.array(range(task.list_length)))
 # specific to the unit vector style of item representations
 setattr(task, 'units_needed', task.list_length+1)
@@ -46,7 +46,7 @@ plt.plot(range(task.list_length+1), context_state, 'b.')
 plt.xlabel('context element index')
 plt.ylabel('activation state')
 plt.title('context state immediately after list presentation')
-plt.show()
+#plt.show()
 
 
 
