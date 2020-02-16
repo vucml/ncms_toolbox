@@ -97,7 +97,7 @@ class Task:
         while not stopped:
             # get probabilities of possible events
             prob_vec = net.prob_recall_basic_tcm(param, self)
-            # prompt generation of recall evetn
+            # prompt generation of recall event
             this_event = rn.choice(self.list_length+1, 1, p=prob_vec)
             self.recalled_items.append(this_event)
             self.recall_attempt += 1

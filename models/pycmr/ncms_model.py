@@ -54,12 +54,8 @@ class Network:
         self.f_layer.activate_unit_vector(index)
         # project activity uses projection to update net_input of to_layer
         self.m_fc_pre.project_activity()
-        # update activation state of c, which triggers integration operation
-        # should integration rate be a stored property of the layer, or just of the integration function?
         self.c_layer.integrate_net_input(param.beta_enc)
         # Hebbian learning on m_fc_exp 
-        # for full cmr implementation, primacy scaling must be possible
-        # will prob need environment to track serial position
         primacy_scaling = (param.P1 * np.exp(-1 * param.P2 * (task.serial_position-1))) + 1
         # primacy scaling modifies learning rate but just in the cf direction
         self.m_fc_exp.hebbian_learning(param.L)
@@ -67,6 +63,7 @@ class Network:
 
     def initialize_context(self, task):
         self.c_layer.initialize_net_input_zeros()
+        # this implementation assumes use of unit vectors
         index = task.list_length
         self.f_layer.activate_unit_vector(index)
         self.m_fc_pre.project_activity()
@@ -74,63 +71,60 @@ class Network:
         self.c_layer.integrate_net_input(1)
 
     def prob_recall_basic_tcm(self, param, task):
+        # This function returns the probability of each studied item being
+        # recalled next.  It is designed to work with both the generative and
+        # predictive versions of the basic_tcm code.
+        #  
         # task keeps track of previous recalls
-
+        #
+        # clear out f_layer net input
+        # then context-to-feature projection activates blend of features 
         self.f_layer.initialize_net_input_zeros()
-        # project from context through m_cf pre and exp
         self.m_cf_pre.project_activity()
         self.m_cf_exp.project_activity()
 
-        # after this, f_layer net_input corresponds to strength
+        # sampling rule modifies net_input
+        # after this, f_layer net_input corresponds to strength in p_recall_cmr.m
         self.f_layer.sampling_fn_classic(param.T)
-
-        # uniform sampling to get things going
-        # strength = np.ones(task.list_length)
-
-        # outcomes [1, LL] represent serial pos of study items being recalled
-        # outcome LL+1 represents recall termination
-
-        # fixed stop prob to get things going
-        # can check param to see what the stop rule is
-
-        # this is if item representations are unit vectors
+        
         # [:-1] excludes the 'start_unit'
         strength = self.f_layer.net_input[:-1]
 
-        n_outcomes = task.list_length + 1
-        prob_vec = np.ones(n_outcomes)
+        # if strength is zero for everyone, set equal support for everything
+        #if sum(strength) == 0:
+        #    strength[:] = 1
+        
+        # prevent repetitions, set strength of previously recalled items to 0
+        for i in range(len(task.recalled_items)):
+            strength[task.recalled_items[i]] = 0
+
+        # initialize probability vector
+        prob_vec = np.zeros(task.list_length + 1)
 
         # calculate stop probability
-        prob_vec[-1] = self.stop_function(param.stop_fn, param, task)
+        if len(task.recalled_items) < task.list_length:
+            prob_vec[-1] = self.stop_function(param.stop_fn, param, task)
+        else:
+            prob_vec[-1] = 1
+            
+        # prob of recalling each study item
         if prob_vec[-1] == 1:
             prob_vec[:-1] = 0
         else:
             prob_vec[:-1] = (1 - prob_vec[-1]) * (strength / np.sum(strength))
 
-        # prevent repetitions
-        for i in range(len(task.recalled_items)):
-            prob_vec[task.recalled_items[i]] = 0
-
-        # 
-        prob_vec = prob_vec / np.sum(prob_vec)
+        # unnecessary?
+        # prob_vec = prob_vec / np.sum(prob_vec)
 
         return prob_vec
         
-        # print(this_event)
-        # return this_event
-        #this_rnd = rn.rand()
-        #print('random number: {0}'.format(this_rnd))
-        #return this_rnd
 
     def stop_function(self, which, param, task):
-        # 
         if which == 'fixed':
             return param.X1
         elif which == 'exponential':
             stop_prob = param.X1 * np.exp(param.X2 * (task.recall_attempt-1))
-            #print(task.recall_attempt-1)
-            #print(stop_prob)
-        # check
+        # ensure probability stays within legal bounds
         if stop_prob > 1:
             stop_prob = 1
         elif stop_prob < 0:
@@ -193,8 +187,6 @@ class Projection:
         # rows index units in to_layer, columns index units in from_layer
         # given that projection operation will be matrix * from_layer.act_state
         self.matrix = np.zeros( (self.to_layer.n_units, self.from_layer.n_units) )
-        # if false, projection will not project activity during simulation?
-        # self.active = True
 
     def init_matrix_identity(self, scaling_factor):
         if self.from_layer.n_units==self.to_layer.n_units:
@@ -210,7 +202,7 @@ class Projection:
         self.to_layer.net_input = self.to_layer.net_input + temp_incoming
 
     def hebbian_learning(self, learning_rate):
-        # the optimized code just updates the needed row or col when unit vectors are used 
+        # optimized code could just update the needed row or col when unit vectors are used 
         # this will be slower; could have a parallel set of optimized functions?
         # hebbian outer product 
         self.matrix = self.matrix + np.outer(self.to_layer.act_state,self.from_layer.act_state) * learning_rate
