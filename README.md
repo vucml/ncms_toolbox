@@ -4,5 +4,5 @@ Neuro-Cognitive Memory Search toolbox
 
 ## Models: pyCMR
 * working on porting the Matlab version of CMR-likelihood
-* ncms_classes.py currently contains all of the code for all of the classes, this will have to be broken up into sensible pieces
+* look in the pyCMR directory for a README.md specific to that model
 
