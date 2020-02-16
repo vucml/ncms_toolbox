@@ -14,6 +14,9 @@ setattr(param, 'L', 1)
 setattr(param, 'Dfc', 1)
 setattr(param, 'Dcf', 1)
 setattr(param, 'T', 1)
+setattr(param, 'X1', 0.01)
+setattr(param, 'X2', 0.1)
+setattr(param, 'stop_fn', 'exponential')
 
 task = Task('ifr_task')
 # task stores information about the immediate free recall task

@@ -7,7 +7,7 @@ class Parameters:
         self.name = name
 
     # def set_parameter(self, param_name, param_val):
-
+    
 class Environment:
     
     def __init__(self, name):
@@ -198,16 +198,23 @@ class Network:
         # outcomes [1, LL] represent serial pos of study items being recalled
         # outcome LL+1 represents recall termination
 
-        # calculate stop probability
         # fixed stop prob to get things going
         # can check param to see what the stop rule is
-        
-        outcomes = task.list_length+1
-        prob_vec = np.ones(outcomes)
+        strength = np.ones(task.list_length)
+
+        n_outcomes = task.list_length + 1
+        prob_vec = np.ones(n_outcomes)
+        # calculate stop probability
+        prob_vec[-1] = self.stop_function(param.stop_fn, param, task)
+        if prob_vec[-1] == 1:
+            prob_vec[:-1] = 0
+        else:
+            prob_vec[:-1] = (1 - prob_vec[-1]) * (strength / np.sum(strength))
+
         for i in range(len(task.recalled_items)):
             prob_vec[task.recalled_items[i]] = 0
         prob_vec = prob_vec / np.sum(prob_vec)
-        this_event = rn.choice(outcomes, 1, p=prob_vec)
+        this_event = rn.choice(n_outcomes, 1, p=prob_vec)
         task.recalled_items.append(this_event)
         # print(this_event)
 
@@ -215,7 +222,19 @@ class Network:
         #this_rnd = rn.rand()
         #print('random number: {0}'.format(this_rnd))
         #return this_rnd
-        
+
+    def stop_function(self, which, param, task):
+        # 
+        if which == 'fixed':
+            return param.X1
+        elif which == 'exponential':
+            stop_prob = param.X1 + np.exp(param.X2 * task.recall_attempt)
+            if stop_prob > 1:
+                stop_prob = 1
+            return stop_prob
+
+
+                
 class Layer:
     
     def __init__(self, name, n_units):
