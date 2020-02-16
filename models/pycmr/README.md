@@ -4,8 +4,10 @@ Python-based object-oriented implementation of the Context Maintenance and Retri
 
 ## Notes
 * See Projects and Issues for next-up to-do items
-* scratch_ifr_pycmr.py: Contains sample code for setting some basic parameters and running a bare-bones simulation of immediate free recall.  At a command line, you can try: python scratch_ifr_pycmr.py
-* ncms_classes.py: Contains all of the code for all of the classes currently, will have to break these out into separate files and come up with a good naming convention. It doesn't make sense to call this ncms, except to the extent that a particular class is general to a bunch of models.  Could split things up so that the network-related and task-related classes are separate.
+* scratch_ifr_pycmr.py: _Start here!_ Contains sample code for setting some basic parameters and running a bare-bones simulation of immediate free recall.  At a command line, you can try: python scratch_ifr_pycmr.py.  Has code to run the model in generative mode and then runs it in predictive mode, giving you the log-likelihood of the generated data. 
+* ncms_model.py: Contains the Network, Layer, Projection class core functions.
+* ncms_task.py: Contains the Task class and Item class core functions.
+* ncms_classes.py: Contains overflow classes.  Note that I'm not sure about the ncms naming convention for all these files, trying to figure out where to use ncms, vs where to use pycmr.
 
 ## Task class functions
 * __init__
