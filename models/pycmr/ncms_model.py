@@ -24,13 +24,6 @@ class Network:
         setattr(self, proj_name, proj)
         #self.projection_list.append(proj)
     
-    # consider whether this fn should be removed
-    def initialize_layers_zeros(self):
-        for this_layer in self.layer_list:
-            # maybe only if verbose?
-            print('initializing ' + this_layer.name)
-            this_layer.initialize_zeros()
-
     def initialize_basic_tcm(self, param, n_units):
         # create f and c layers
         f_layer = Layer('f', n_units)
