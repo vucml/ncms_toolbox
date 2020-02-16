@@ -36,20 +36,13 @@ setattr(task, 'units_needed', task.list_length+1)
 setattr(task, 'serial_position', 1)
 
 
-# generate n trials recall sequences
-recalls = np.zeros((task.n_trials, task.list_length), dtype=int)
+recalls = task.ifr_task_generate(param)
 
-for i in range(task.n_trials):
-    # create a network
-    net = Network('cmr_basic')
-    net.initialize_basic_tcm(param, task.units_needed)
-    results = task.ifr_trial_generate(net, param)
-    these = np.array(results[:-1])
-    # print(type(these))
-    these = these + 1
-    # add +1 as we want recalls matrix to be in terms of serial position
-    recalls[i,:len(these)] = these
+LL = task.ifr_task_predict(recalls, param)
 
+
+print('log-likelihood: {0}'.format(LL))
+    
 #print(recalls)
 quick_plot_spc(quick_spc(recalls, task.list_length))
 

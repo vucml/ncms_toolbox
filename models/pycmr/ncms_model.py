@@ -80,22 +80,16 @@ class Network:
         # integrate fully, beta = 1
         self.c_layer.integrate_net_input(1)
 
-    def recall_attempt_basic_tcm(self, param, task):
-        # print('implement recall attempt basic tcm')
-        # task can keep track of previous recalls
+    def prob_recall_basic_tcm(self, param, task):
+        # task keeps track of previous recalls
 
-        # get ready for the next recall attempt by zeroing out net_input of f
         self.f_layer.initialize_net_input_zeros()
-        # project from context through m_cf 
-        # project activity uses projection to update net_input of to_layer
+        # project from context through m_cf pre and exp
         self.m_cf_pre.project_activity()
         self.m_cf_exp.project_activity()
 
-        # transformation from net to act seems like a reasonable place
-        # to put the sampling code that was in p_recall_cmr in matlab version
         # after this, f_layer net_input corresponds to strength
         self.f_layer.sampling_fn_classic(param.T)
-        # print(self.f_layer.net_input)
 
         # uniform sampling to get things going
         # strength = np.ones(task.list_length)
@@ -126,12 +120,11 @@ class Network:
 
         # 
         prob_vec = prob_vec / np.sum(prob_vec)
-        #print(prob_vec)
-        this_event = rn.choice(n_outcomes, 1, p=prob_vec)
-        task.recalled_items.append(this_event)
-        # print(this_event)
 
-        return this_event
+        return prob_vec
+        
+        # print(this_event)
+        # return this_event
         #this_rnd = rn.rand()
         #print('random number: {0}'.format(this_rnd))
         #return this_rnd
