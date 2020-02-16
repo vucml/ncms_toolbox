@@ -100,11 +100,15 @@ class Task:
         while not stopped:
             # prompt a recall
             this_event = net.recall_attempt_basic_tcm(param, self)
+            self.recall_attempt += 1
             results.append(this_event[0])
             # check if it was a stop event
             if this_event==self.list_length:
                 stopped = True
-            
+            else:
+                # reactivate the winner
+                net.reactivate_item_basic_tcm(this_event, param, self)
+                
         return results
 
 
@@ -194,16 +198,35 @@ class Network:
         # print('implement recall attempt basic tcm')
         # task can keep track of previous recalls
 
+        # get ready for the next recall attempt by zeroing out net_input of f
+        self.f_layer.initialize_net_input_zeros()
+        # project from context through m_cf 
+        # project activity uses projection to update net_input of to_layer
+        self.m_cf_pre.project_activity()
+        self.m_cf_exp.project_activity()
+
+        # transformation from net to act seems like a reasonable place
+        # to put the sampling code that was in p_recall_cmr in matlab version
+        # after this, f_layer net_input corresponds to strength
+        self.f_layer.sampling_fn_classic(param.T)
+        # print(self.f_layer.net_input)
+
         # uniform sampling to get things going
+        # strength = np.ones(task.list_length)
+
         # outcomes [1, LL] represent serial pos of study items being recalled
         # outcome LL+1 represents recall termination
 
         # fixed stop prob to get things going
         # can check param to see what the stop rule is
-        strength = np.ones(task.list_length)
+
+        # this is if item representations are unit vectors
+        # [:-1] excludes the 'start_unit'
+        strength = self.f_layer.net_input[:-1]
 
         n_outcomes = task.list_length + 1
         prob_vec = np.ones(n_outcomes)
+
         # calculate stop probability
         prob_vec[-1] = self.stop_function(param.stop_fn, param, task)
         if prob_vec[-1] == 1:
@@ -211,9 +234,13 @@ class Network:
         else:
             prob_vec[:-1] = (1 - prob_vec[-1]) * (strength / np.sum(strength))
 
+        # prevent repetitions
         for i in range(len(task.recalled_items)):
             prob_vec[task.recalled_items[i]] = 0
+
+        # 
         prob_vec = prob_vec / np.sum(prob_vec)
+        #print(prob_vec)
         this_event = rn.choice(n_outcomes, 1, p=prob_vec)
         task.recalled_items.append(this_event)
         # print(this_event)
@@ -228,11 +255,25 @@ class Network:
         if which == 'fixed':
             return param.X1
         elif which == 'exponential':
-            stop_prob = param.X1 + np.exp(param.X2 * task.recall_attempt)
-            if stop_prob > 1:
-                stop_prob = 1
-            return stop_prob
+            stop_prob = param.X1 * np.exp(param.X2 * (task.recall_attempt-1))
+            #print(task.recall_attempt-1)
+            #print(stop_prob)
+        # check
+        if stop_prob > 1:
+            stop_prob = 1
+        elif stop_prob < 0:
+            stop_prob = 0
+        return stop_prob
 
+    def reactivate_item_basic_tcm(self, this_event, param, task):
+        # items are unit vectors, turn on f unit
+        self.c_layer.initialize_net_input_zeros()
+        # this clears out f_layer and then activates unit
+        self.f_layer.activate_unit_vector(this_event)
+        # project to context
+        self.m_fc_pre.project_activity()
+        # update context
+        self.c_layer.integrate_net_input(param.beta_rec)
 
                 
 class Layer:
