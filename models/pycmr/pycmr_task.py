@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.random as rn
-from ncms_model import *
+from pycmr_network import *
 
 class Task:
     

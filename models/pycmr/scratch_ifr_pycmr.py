@@ -2,8 +2,8 @@ import numpy as np
 import numpy.random as rn
 import matplotlib.pyplot as plt
 
-from ncms_task import *
-from ncms_model import *
+from pycmr_task import *
+from pycmr_network import *
 from ncms_analysis import *
 #from ncms_classes import *
 
