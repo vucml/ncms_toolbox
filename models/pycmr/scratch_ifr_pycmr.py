@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.random as rn
 import matplotlib.pyplot as plt
 
 from ncms_task import *
@@ -39,7 +40,6 @@ setattr(task, 'serial_position', 1)
 recalls = task.ifr_task_generate(param)
 
 LL = task.ifr_task_predict(recalls, param)
-
 
 print('log-likelihood: {0}'.format(LL))
     

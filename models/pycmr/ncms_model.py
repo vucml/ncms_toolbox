@@ -141,6 +141,7 @@ class Network:
         # update context
         self.c_layer.integrate_net_input(param.beta_rec)
 
+
                 
 class Layer:
     

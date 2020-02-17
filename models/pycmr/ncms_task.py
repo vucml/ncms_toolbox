@@ -127,7 +127,8 @@ class Task:
             if rec_events[i] != self.list_length:
                 net.reactivate_item_basic_tcm(rec_events[i], param, self)
         return likelihood
-                
+
+                    
 # allows item to act as a data struct
 class Item:
 
