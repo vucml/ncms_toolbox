@@ -25,7 +25,7 @@ setattr(param, 'X2', 0.7)
 
 # task stores information about the immediate free recall task
 task = Task('ifr_task')
-setattr(task, 'n_trials', 500)
+setattr(task, 'n_trials', 1000)
 #setattr(task, 'n_trials', 1)
 setattr(task, 'list_length', 15)
 setattr(task, 'pres_itemnos', np.array(range(task.list_length)))
@@ -42,21 +42,22 @@ from scipy.optimize import differential_evolution
 # need to create a wrapper function, working backwards
 
 fixed = Parameters('fixed params')
-#setattr(param, 'beta_enc', 0.8)
-setattr(fixed, 'beta_rec', 0.8)
+setattr(fixed, 'beta_enc', 0.8)
+#setattr(fixed, 'beta_rec', 0.8)
 setattr(fixed, 'P1', 100)
 setattr(fixed, 'P2', 10)
 setattr(fixed, 'L', 1)
-#setattr(fixed, 'Dfc', 10)
+setattr(fixed, 'Dfc', 10)
 setattr(fixed, 'Dcf', 1)
 setattr(fixed, 'T', 2)
 setattr(fixed, 'stop_fn', 'exponential')
 setattr(fixed, 'X1', 0.005)
 setattr(fixed, 'X2', 0.7)
 
-free_names = ('beta_enc', 'Dfc')
-bounds = [(0, 1), (0, 100)]
-
+#free_names = ('beta_rec', 'Dfc')
+free_names = ('beta_rec')
+#bounds = [(0, 1), (0, 100)]
+bounds = [(0, 1)]
 
 
 def eval_param_ifr(x, recalls, param, free_names, task):
@@ -81,7 +82,17 @@ ftuple = (recalls, fixed, free_names, task)
 # test out the eval param function
 #param_vec = np.array([0.5, 8])
 #LL1 = eval_param_ifr(param_vec, ftuple)
-param_vec = np.array([0.8, 10])
+
+#param_vec = np.array([0.8, 10])
+param_vec = np.array([0.8])
+
+# there's a bug in this code, if the list of names of free parameters only has one name in it, \
+# it is treated as a string rather than a tuple inside the eval function, so free_names[i] just grabs 
+# the first character of the name for setattr instead of the whole name.  I haven't figured out how 
+# the differential_evolution code works well enough yet, have to check if the same issue occurs when 
+# the fn gets called from within differential_evolution.  One solution could be to have a more elaborate 
+# param structure that gets passed in, instead of a list of strings
+
 LLorig = eval_param_ifr(param_vec, ftuple[0], ftuple[1], ftuple[2], ftuple[3])
 #print('altered: {:.2f}; unaltered: {:.2f}'.format(LL1,LL2))
 
