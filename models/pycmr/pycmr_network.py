@@ -59,7 +59,7 @@ class Network:
         primacy_scaling = (param.P1 * np.exp(-1 * param.P2 * (task.serial_position-1))) + 1
         # primacy scaling modifies learning rate but just in the cf direction
         self.m_fc_exp.hebbian_learning(param.L)
-        self.m_cf_exp.hebbian_learning(param.L+primacy_scaling)        
+        self.m_cf_exp.hebbian_learning(param.L*primacy_scaling)        
 
     def initialize_context(self, task):
         self.c_layer.initialize_net_input_zeros()
@@ -138,6 +138,7 @@ class Network:
         self.f_layer.activate_unit_vector(this_event)
         # project to context
         self.m_fc_pre.project_activity()
+        self.m_fc_exp.project_activity()
         # update context
         self.c_layer.integrate_net_input(param.beta_rec)
 
@@ -157,7 +158,11 @@ class Layer:
         self.net_input = np.zeros( (self.n_units) )
         
     def normalize_net_input(self):
-        self.net_input = self.net_input / np.sqrt(np.sum(self.net_input**2))
+        # self.net_input = self.net_input / np.sqrt(np.sum(self.net_input**2))
+        self.net_input = self.net_input / np.linalg.norm(self.net_input)
+
+    def normalize_act_state(self):
+        self.act_state = self.act_state / np.linalg.norm(self.act_state)
 
     def initialize_act_state_zeros(self):
         self.act_state = np.zeros( (self.n_units) )

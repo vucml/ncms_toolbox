@@ -9,14 +9,14 @@ from ncms_analysis import *
 # model parameters
 param = Parameters('basic_tcm')
 # could have named parameter sets stored in some imported file
-setattr(param, 'beta_enc', 0.8)
-setattr(param, 'beta_rec', 0.8)
-setattr(param, 'P1', 100)
-setattr(param, 'P2', 10)
+setattr(param, 'beta_enc', 0.6)
+setattr(param, 'beta_rec', 0.9)
+setattr(param, 'P1', 3)
+setattr(param, 'P2', 1)
 setattr(param, 'L', 1)
-setattr(param, 'Dfc', 10)
+setattr(param, 'Dfc', 3)
 setattr(param, 'Dcf', 1)
-setattr(param, 'T', 2)
+setattr(param, 'T', 0.35)
 setattr(param, 'stop_fn', 'exponential')
 setattr(param, 'X1', 0.005)
 setattr(param, 'X2', 0.7)
@@ -25,9 +25,9 @@ setattr(param, 'X2', 0.7)
 
 # task stores information about the immediate free recall task
 task = Task('ifr_task')
-setattr(task, 'n_trials', 1000)
+setattr(task, 'n_trials', 120)
 #setattr(task, 'n_trials', 1)
-setattr(task, 'list_length', 15)
+setattr(task, 'list_length', 24)
 setattr(task, 'pres_itemnos', np.array(range(task.list_length)))
 # specific to the unit vector style of item representations
 setattr(task, 'units_needed', task.list_length+1)
@@ -42,22 +42,22 @@ from scipy.optimize import differential_evolution
 # need to create a wrapper function, working backwards
 
 fixed = Parameters('fixed params')
-setattr(fixed, 'beta_enc', 0.8)
-#setattr(fixed, 'beta_rec', 0.8)
-setattr(fixed, 'P1', 100)
-setattr(fixed, 'P2', 10)
+setattr(fixed, 'beta_enc', 0.6)
+#setattr(fixed, 'beta_rec', 0.9)
+setattr(fixed, 'P1', 3)
+setattr(fixed, 'P2', 1)
 setattr(fixed, 'L', 1)
-setattr(fixed, 'Dfc', 10)
+setattr(fixed, 'Dfc', 3)
 setattr(fixed, 'Dcf', 1)
-setattr(fixed, 'T', 2)
+setattr(fixed, 'T', 0.35)
 setattr(fixed, 'stop_fn', 'exponential')
 setattr(fixed, 'X1', 0.005)
-setattr(fixed, 'X2', 0.7)
+#setattr(fixed, 'X2', 0.7)
 
-#free_names = ('beta_rec', 'Dfc')
-free_names = ('beta_rec')
-#bounds = [(0, 1), (0, 100)]
-bounds = [(0, 1)]
+free_names = ('beta_rec', 'X2')
+#free_names = ('beta_rec')
+bounds = [(0, 1), (0, 2)]
+#bounds = [(0, 1)]
 
 
 def eval_param_ifr(x, recalls, param, free_names, task):
@@ -83,8 +83,8 @@ ftuple = (recalls, fixed, free_names, task)
 #param_vec = np.array([0.5, 8])
 #LL1 = eval_param_ifr(param_vec, ftuple)
 
-#param_vec = np.array([0.8, 10])
-param_vec = np.array([0.8])
+param_vec = np.array([0.9, 0.7])
+#param_vec = np.array([0.8])
 
 # there's a bug in this code, if the list of names of free parameters only has one name in it, \
 # it is treated as a string rather than a tuple inside the eval function, so free_names[i] just grabs 
@@ -100,6 +100,7 @@ print('LL with generating params: {:.2f}'.format(LLorig))
 
 
 # result = differential_evolution(eval_param_ifr, bounds, args=(ftuple), maxiter=3)
-result = differential_evolution(eval_param_ifr, bounds, args=(ftuple), maxiter=3)
+# result = differential_evolution(eval_param_ifr, bounds, args=(ftuple), maxiter=3)
 
-print('DE solution: {}; LL: {}'.format(result.x, result.fun))
+# print('DE solution: {}; LL: {}'.format(result.x, result.fun))
+print('done')
