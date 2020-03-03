@@ -8,6 +8,8 @@ function out_obj = wald_decision(in_obj, param)
 % in_obj.thisrt    - how long the response took in msec or sec
 %
 % param.simulation_mode 'predictive' or 'generative'
+%   if predictive, in_obj needs to have fields as shown above
+%   if generative, in_obj isn't used, can be an empty vector ([])
 % param.n_racers - how many decision alternatives (e.g., 2)
 % param.range_rt - what is the possible range of response times
 % (e.g., [0 3000])
