@@ -1,18 +1,18 @@
 
 % set the seed for rng
 % uncomment if you want it to always turn out the same way
-%rng(42)
+rng(42)
 
 % demonstration of predictive and generative modeling with CMR
 
 % set parameters for a basic version of CMR
 param = struct();
 % context integration rate during encoding
-param.B_enc = 0.6;
+param.B_enc = 0.7;
 % context integration rate during recall
 param.B_rec = 0.5;
 % primacy learning rate boost
-param.P1 = 3;
+param.P1 = 8;
 param.P2 = 1;
 % non-linearity in the recall competition 
 % 'sampling rule' controls calculation of item support in the competition
@@ -46,12 +46,24 @@ seq = generate_cmr(param, data);
 % store the recall sequences in the data structure
 data.recalls = seq;
 
+%figpath = '';
+figpath = '~/Science/GitHub/chapter-predictive-cmr/figs/';
+
 % calculate and plot some basic summary statistics
 % uses EMBAM functions
 figure(1); clf;
 plot_spc(spc(seq,data.subject,LL));
+if ~isempty(figpath)
+  print('-depsc', fullfile(figpath,'basic_spc.eps'));
+  system('epstopdf basic_spc.eps');
+end
 figure(2); clf;
 plot_crp(crp(seq,data.subject,LL));
+if ~isempty(figpath)
+  print('-depsc', fullfile(figpath,'basic_crp.eps'));
+  system('epstopdf basic_crp.eps');
+end
+
 
 % a simple test of parameter recovery
 % create 11 model variants with different values of 
