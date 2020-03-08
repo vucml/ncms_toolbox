@@ -5,6 +5,8 @@ rng(42)
 
 % demonstration of predictive and generative modeling with CMR
 
+% Section 1.  Setting model parameters and task details
+
 % set parameters for a basic version of CMR
 param = struct();
 % context integration rate during encoding
@@ -41,6 +43,9 @@ data.subject = ones(n_trials,1);
 data.recalls = zeros(n_trials,max_recalls);
 data.pres_itemnos = repmat([1:LL],n_trials,1);
 
+% Section 2.  Generating synthetic data and plotting summary
+% statistics from the data
+
 % use the CMR model to generate 120 trials of synthetic data
 seq = generate_cmr(param, data);
 % store the recall sequences in the data structure
@@ -64,6 +69,7 @@ if ~isempty(figpath)
   system('epstopdf basic_crp.eps');
 end
 
+% Section 3. Using predictive simulations to perform parameter recovery
 
 % a simple test of parameter recovery
 % create 11 model variants with different values of 
@@ -94,6 +100,9 @@ h.Children(1).LineWidth = 2;
 h.Children(1).MarkerFaceColor = 'w';
 h.FontSize=14;
 
+% Section 4. Creating synthetic neural data and linking it to the
+% temporal context reinstatement process.  Generating synthetic
+% behavioral data using this 'neural' model. 
 
 % construct variable beta rec model
 % beta rec centers on 0.5 with random normal deviations
@@ -122,6 +131,9 @@ var_data = data;
 % put these newly generated recall events on the data struct
 var_data.recalls = seq;
 
+% Section 5. Predictive simulations given the data from the model
+% with variable temporal reinstatement.
+
 % what's the likelihood under the perfect case where B_rec
 % fluctuations perfectly match those used to generate the data
 fstruct = struct();
@@ -149,7 +161,6 @@ fstruct.data = var_data;
 % Grid search
 % Get likelihood for different values of beta rec and neural
 % scaling parameter
-
 
 B_rec_vals = [0:0.1:1];
 nsp_vals = [.1 .2];
@@ -210,6 +221,8 @@ for i=2:4
   h.Children(i).MarkerFaceColor = 'w';
 end
 h.FontSize=14;
+
+% Section 6.  Model comparison statistics.
 
 % AIC with correction for finite samples
 % n is number of estimated data points
