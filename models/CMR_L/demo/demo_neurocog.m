@@ -60,13 +60,11 @@ figure(1); clf;
 plot_spc(spc(seq,data.subject,LL));
 if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'basic_spc.eps'));
-  system('epstopdf basic_spc.eps');
 end
 figure(2); clf;
 plot_crp(crp(seq,data.subject,LL));
 if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'basic_crp.eps'));
-  system('epstopdf basic_crp.eps');
 end
 
 % Section 3. Using predictive simulations to perform parameter recovery
@@ -86,19 +84,25 @@ end
 
 % demonstrate best-fitting value matching the generating value
 figure(3); clf;
-plot(B_rec_vals,err,'ko-');
+plot(B_rec_vals,-err,'ko-');
 hold on;
 
 xlabel('\beta_{rec} value');
-ylabel('|log-likelihood|');
+ylabel('log-likelihood');
 h = gca;
 % grab the current y-axis range
 ylim = h.YLim;
 % add a line representing the generating value of beta rec
 plot([param.B_rec param.B_rec],[h.YLim(1) h.YLim(2)],'r--');
-h.Children(1).LineWidth = 2;
-h.Children(1).MarkerFaceColor = 'w';
+h.Children(1).LineWidth = 1.5;
+h.Children(2).LineWidth = 1.5;
+h.Children(2).MarkerFaceColor = 'w';
+h.Children(2).MarkerSize = 8;
 h.FontSize=14;
+
+if ~isempty(figpath)
+  print('-depsc', fullfile(figpath,'B_rec_sweep.eps'));
+end
 
 % Section 4. Creating synthetic neural data and linking it to the
 % temporal context reinstatement process.  Generating synthetic
@@ -143,16 +147,22 @@ fstruct.verbose = false;
 best_case_err = eval_param_cmr(temp_param, fstruct);
 
 % turning variable B rec into synthetic neural data
+
+% adding noise before normalizing
+noise_strength = 0.1;
+temp_neural = synth_neural_fluct;
+temp_neural = temp_neural + (randn(n_trials, max_recalls) * noise_strength);
+
 neural_mat = zeros(n_trials, max_recalls);
 for i=1:n_trials
-  neural_mat(i,:) = (synth_neural_fluct(i,:) - mean(synth_neural_fluct(i,:))) / std(synth_neural_fluct(i,:));
+  neural_mat(i,:) = (temp_neural(i,:) - mean(temp_neural(i,:))) / std(temp_neural(i,:));
 end
 % add a bit of noise to see how robust it is
 % reliably prefers the neural version even when noise is as strong
 % as the original neural signal fluctuations
 % when noise_strength is 0.6 it seems to fail about half the time
-noise_strength = 0.1;
-neural_mat = neural_mat + (randn(n_trials, max_recalls) * noise_strength);
+%noise_strength = 0.1;
+%neural_mat = neural_mat + (randn(n_trials, max_recalls) * noise_strength);
 
 fstruct = struct();
 fstruct.verbose = false;
@@ -179,7 +189,7 @@ for i=1:length(B_rec_vals)
   temp_param.B_rec = B_rec_vals(i);
   temp_param.n = 0;
   out = demo_wrap_eval(temp_param, neural_mat, fstruct);
-  LL_naive(i) = out.err;
+  LL_naive(i) = -out.err;
 end
 
 % log likelihood for neurally informed model variants
@@ -195,7 +205,7 @@ for i=1:length(param_sweep_B_rec)
   
   out = demo_wrap_eval(temp_param, neural_mat, fstruct);    
   %err = out.err;
-  LL_sweep_neural(i) = out.err;
+  LL_sweep_neural(i) = -out.err;
   %tr_err(i,j) = err;
   
 end
@@ -205,29 +215,37 @@ LL_grid_neural = reshape(LL_sweep_neural,length(nsp_vals),length(B_rec_vals));
 
 figure(4); clf;
 % neurally naive
-plot([0:0.1:1],LL_naive(1,:),'go-');
+plot([0:0.1:1],LL_naive(1,:),'Color',[0 0 1],'Marker','d');
 hold on;
 % neural scaling 0.1
-
-plot([0:0.1:1],LL_grid_neural(1,:),'bo-');
+plot([0:0.1:1],LL_grid_neural(1,:),'Color',[1 0 0],'Marker','o');
 % neural scaling 0.2
-plot([0:0.1:1],LL_grid_neural(2,:),'ro-');
+plot([0:0.1:1],LL_grid_neural(2,:),'Color',[0.5 0 0.5],'Marker','^');
 xlabel('\beta_{rec} value');
-ylabel('|log-likelihood|');
+ylabel('log-likelihood');
 h = gca();
+h.YLim = [-2500 -2280];
 plot([param.B_rec param.B_rec],[h.YLim(1) h.YLim(2)],'r--');
 for i=2:4
-  h.Children(i).LineWidth = 2;
+  h.Children(i).LineWidth = 1.5;
+  %h.Children(i).Marker = 'o';
+  h.Children(i).MarkerSize = 8;
   h.Children(i).MarkerFaceColor = 'w';
 end
 h.FontSize=14;
+
+legend('\nu = 0','\nu = 0.1', '\nu = 0.2', 'Location', 'SouthEast');
+if ~isempty(figpath)
+  print('-depsc', fullfile(figpath,'B_nu_sweep.eps'));
+end
+
 
 % Section 6.  Model comparison statistics.
 
 % AIC with correction for finite samples
 % n is number of estimated data points
 % V is number of free param
-% L is -1 * log-likelihood
+% L is log-likelihood
 % 2*L + 2*V + (2*V*(V+1)) / (n-V-1)
 
 % count up the number of recall events, this is the number of data points
@@ -239,13 +257,13 @@ ndata = sum(fstruct.data.recalls>0,'all') + n_trials;
 % here only B_rec is free
 V = 1;
 for i=1:length(LL_naive)
-  AIC_naive(i) = 2*LL_naive(i) + 2*V + ((2*V*(V+1)) / (ndata-V-1));
+  AIC_naive(i) = -2*LL_naive(i) + 2*V + ((2*V*(V+1)) / (ndata-V-1));
 end
 
 % B_rec and neural scaling are free
 V = 2;
 for i=1:length(LL_sweep_neural)
-  AIC_sweep_neural(i) = 2*LL_sweep_neural(i) + 2*V + ((2*V*(V+1)) / (ndata-V-1));
+  AIC_sweep_neural(i) = -2*LL_sweep_neural(i) + 2*V + ((2*V*(V+1)) / (ndata-V-1));
 end
 
 % find the best score
@@ -280,6 +298,52 @@ fprintf('\nNeurally informed max-likelihood\n');
 fprintf('Max-likelihood beta_rec: %.2f\n', param_sweep_B_rec(ind_neural));
 fprintf('Max-likelihood neural scaling: %.2f\n', param_sweep_nsp(ind_neural));
 fprintf('Likelihood for neurally informed model: %.2f\n', LL_sweep_neural(ind_neural));
+fprintf('AIC score, neurally informed: %.2f\n', AIC_sweep_neural(ind_neural));
 fprintf('\nComparison of neurally naive and neurally informed models\n');
 fprintf('weighted AIC for neurally naive model: %f\n', wAIC(1));
 fprintf('weighted AIC for neurally informed model: %f\n', wAIC(2));
+
+% Section 7.  Some final tests
+
+% what happens if you scramble the neural signal by permuting the
+% rows, this is an alternative baseline
+
+% set n_scrambles to 100 for a more accurate p-value (though the code will
+% take several seconds longer to run)
+n_scrambles = 20;
+LL_permtest = zeros(1, n_scrambles);
+
+% for this exploration of permutation statistics we can assume we
+% know the true generating parameters of B_rec and n, then we can
+% see how scrambling the neural signal affects the likelihood
+% scores under otherwise perfect conditions
+
+for i = 1:n_scrambles
+  
+  temp_param = param;
+
+  temp_param.B_rec = base_B_rec;
+  temp_param.n = neural_signal_strength;
+  
+  row_perm = randperm(n_trials);
+  scram_neural_mat = neural_mat(row_perm,:);
+  
+  out = demo_wrap_eval(temp_param, scram_neural_mat, fstruct);    
+
+  LL_permtest(i) = -out.err;
+  
+end
+
+% we can get a p-value out of this permutation analysis by
+% comparing the log-likelihood of the model with the unscrambled
+% neural signal, to the distribution of log-likelihoods with
+% different scrambles of the neural signal
+
+pval = sum(LL_permtest>LL_sweep_neural(ind_neural))/n_scrambles;
+
+fprintf('\nBest log-likelihood with scrambled neural signal: %.2f\n',min(LL_permtest));
+fprintf('p-value for neurally informed model against permut. distrib.: %f\n',pval);
+
+
+
+
