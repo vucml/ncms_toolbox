@@ -1,75 +1,124 @@
+%
+% Tutorial code for
+% Polyn, S. M. Assessing neurocognitive hypotheses in a predictive
+% model of the free-recall task.  
 
-% set the seed for rng
+% set the seed for random number generation
 % uncomment if you want it to always turn out the same way
+% comment if you want it to vary from run to run
 rng(42)
 
-% demonstration of predictive and generative modeling with CMR
+% This tutorial provides a demonstration of predictive and
+% generative modeling with the Context Maintenance and Retrieval (CMR)
+% model 
 
+%%
 % Section 1.  Setting model parameters and task details
+%%
 
-% set parameters for a basic version of CMR
+% creating parameters for a basic version of CMR
 param = struct();
-% context integration rate during encoding
+% B_enc: context integration rate during encoding
 param.B_enc = 0.7;
-% context integration rate during recall
+% B_rec: context integration rate during recall
 param.B_rec = 0.5;
-% primacy learning rate boost
+% P1 and P2 control the primacy mechanism (a learning rate boost
+% for early serial positions)
 param.P1 = 8;
 param.P2 = 1;
-% non-linearity in the recall competition 
-% 'sampling rule' controls calculation of item support in the competition
+% 'sampling_rule' and T control the input to the recall competition
+% 'classic' means the version described in Howard & Kahana (2002) 
+% (a form of softmax)
+% T controls degree of non-linearity in the transformation from
+% item support to probability of recall
 param.sampling_rule = 'classic';
 param.T = 0.35;
-% likelihood of recall termination
+% 'stop_rule', X1, and X2 control likelihood of recall termination
+% 'op': termination probability increases steadily with output position
 param.stop_rule = 'op';
 param.X1 = 0.001;
-param.X2 = 0.6;
-% the strength of pre-experimental associations
-% D means the diagonal elements of the associative matrices
+param.X2 = 0.5;
+% Dfc and Dcf control the strength of pre-experimental associations
+% (D refers to the diagonal elements of the associative matrices)
 % fc / cf specifies direction of projection
 param.Dfc = 3;
 param.Dcf = 1;
 
-% runs through params and checks for missing fields
+% check_param_cmr is a helper script that runs through params and
+% checks for missing fields 
 param = check_param_cmr(param);
 
-% some task details 
+% Here we specify the free-recall task details 
+% LL: list length
 LL = 24;
 n_trials = 120;
+% since we are excluding repeats and intrusions, max_recalls == LL
 max_recalls = LL;
-% creating a data structure for our synthetic (model generated) data
+% Here we create a data structure for our synthetic
+% (model-generated) data
+% each matrix attached to the data structure has a similar format
+% each row corresponds to a different trial
 data = struct();
+% integer values indicate participant identity, here we pretend there
+% is just one participant (since all trials are generated using the
+% same parameters)
 data.subject = ones(n_trials,1);
+% the recalls matrix: each column corresponds to an output
+% position, and the integer value corresponds to the serial
+% position of the recalled item
 data.recalls = zeros(n_trials,max_recalls);
+% the presented item numbers matrix: each column corresponds to a
+% serial position, with the integer value corresponding to the
+% item's index in a word-pool.  Here we are not simulating item
+% identities so we set these to dummy values of 1 to list length
 data.pres_itemnos = repmat([1:LL],n_trials,1);
 
+%%
 % Section 2.  Generating synthetic data and plotting summary
 % statistics from the data
+%%
 
 % use the CMR model to generate 120 trials of synthetic data
+% (recall sequences)
 seq = generate_cmr(param, data);
 % store the recall sequences in the data structure
 data.recalls = seq;
+
+% figpath determines where on disk the code will save any created
+% figures, if figpath is an empty string, the code will not save
+% the figures to disk 
 
 %figpath = '';
 figpath = '~/Science/GitHub/chapter-predictive-cmr/figs/';
 
 % calculate and plot some basic summary statistics
-% uses EMBAM functions
+% these functions are in the EMBAM toolbox from GitHub
+% (episodic memory behavioral analysis toolbox)
+% github.com/vucml/EMBAM
+
+% serial position curve
 figure(1); clf;
+% spc function returns a matrix of recall probabilities
+% plot_spc function makes the graph
 plot_spc(spc(seq,data.subject,LL));
 if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'basic_spc.eps'));
 end
+
+% lag-based conditional response probability analysis (lag-CRP)
 figure(2); clf;
+% crp function returns a matrix of transition probabilities
+% plot_crp function makes the graph
 plot_crp(crp(seq,data.subject,LL));
 if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'basic_crp.eps'));
 end
 
+%%
 % Section 3. Using predictive simulations to perform parameter recovery
+%%
 
-% a simple test of parameter recovery
+% A simple test of parameter recovery
 % create 11 model variants with different values of 
 % beta rec, which controls temporal reinstatement
 % evaluate likelihood of the synthetic data for each model variant
@@ -104,9 +153,11 @@ if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'B_rec_sweep.eps'));
 end
 
+%%
 % Section 4. Creating synthetic neural data and linking it to the
 % temporal context reinstatement process.  Generating synthetic
 % behavioral data using this 'neural' model. 
+%%
 
 % construct variable beta rec model
 % beta rec centers on 0.5 with random normal deviations
@@ -135,8 +186,54 @@ var_data = data;
 % put these newly generated recall events on the data struct
 var_data.recalls = seq;
 
+% demonstration of how the lag-CRP changes for low vs high levels
+% of temporal reinstatement
+
+% create masks for recall events with low vs high temporal reinstatement
+lo_B_rec_mask = var_B_rec < 0.5;
+hi_B_rec_mask = var_B_rec > 0.5;
+
+% lag-CRP using a 'from_rec_mask' 
+% each recall transition is from one item and to another, this mask
+% is applied on the 'from' side
+lo_lc = crp(var_data.recalls, ...
+            var_data.subject, ...
+            LL, lo_B_rec_mask);
+
+hi_lc = crp(var_data.recalls, ...
+            var_data.subject, ...
+            LL, hi_B_rec_mask);
+
+figure(4); clf;
+plot([-5:5],lo_lc(:,LL-5:LL+5),'ko-')
+hold on;
+plot([-5:5],hi_lc(:,LL-5:LL+5),'r^-')
+
+% make the figure look pretty
+h = gca();
+h.Children(1).MarkerSize = 10;
+h.Children(1).MarkerFaceColor = 'w';
+h.Children(1).LineWidth = 1.5;
+h.Children(2).MarkerSize = 10;
+h.Children(2).MarkerFaceColor = 'w';
+h.Children(2).LineWidth = 1.5;
+h.FontSize = 16;
+h.XLim = [-5.5 5.5];
+h.YLim = [0 0.5];
+h.XTick = [-5 -4 -3 -2 -1 0 1 2 3 4 5];
+h.YTick = [0:0.1:0.5];
+h.XLabel.String = 'Lag';
+h.YLabel.String = 'Conditional Response Prob.';
+
+if ~isempty(figpath)
+  print('-depsc', fullfile(figpath,'var_crp.eps'));
+end
+
+
+%%
 % Section 5. Predictive simulations given the data from the model
 % with variable temporal reinstatement.
+%%
 
 % what's the likelihood under the perfect case where B_rec
 % fluctuations perfectly match those used to generate the data
@@ -213,7 +310,7 @@ end
 % reshaping here is just to make graphing easier
 LL_grid_neural = reshape(LL_sweep_neural,length(nsp_vals),length(B_rec_vals));
 
-figure(4); clf;
+figure(5); clf;
 % neurally naive
 plot([0:0.1:1],LL_naive(1,:),'Color',[0 0 1],'Marker','d');
 hold on;
@@ -224,7 +321,7 @@ plot([0:0.1:1],LL_grid_neural(2,:),'Color',[0.5 0 0.5],'Marker','^');
 xlabel('\beta_{rec} value');
 ylabel('log-likelihood');
 h = gca();
-h.YLim = [-2500 -2280];
+h.YLim = [-3000 -2700];
 plot([param.B_rec param.B_rec],[h.YLim(1) h.YLim(2)],'r--');
 for i=2:4
   h.Children(i).LineWidth = 1.5;
@@ -239,8 +336,10 @@ if ~isempty(figpath)
   print('-depsc', fullfile(figpath,'B_nu_sweep.eps'));
 end
 
-
+%%
 % Section 6.  Model comparison statistics.
+%%
+
 
 % AIC with correction for finite samples
 % n is number of estimated data points
@@ -303,7 +402,9 @@ fprintf('\nComparison of neurally naive and neurally informed models\n');
 fprintf('weighted AIC for neurally naive model: %f\n', wAIC(1));
 fprintf('weighted AIC for neurally informed model: %f\n', wAIC(2));
 
+%%
 % Section 7.  Some final tests
+%%
 
 % what happens if you scramble the neural signal by permuting the
 % rows, this is an alternative baseline

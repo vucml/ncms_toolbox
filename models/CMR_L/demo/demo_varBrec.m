@@ -22,7 +22,7 @@ param.T = 0.35;
 % likelihood of recall termination
 param.stop_rule = 'op';
 param.X1 = 0.001;
-param.X2 = 0.6;
+param.X2 = 0.5;
 % the strength of pre-experimental associations
 % D means the diagonal elements of the associative matrices
 % fc / cf specifies direction of projection
