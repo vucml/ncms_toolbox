@@ -1,6 +1,7 @@
 # ncms_toolbox
 Neuro-Cognitive Memory Search toolbox
-This toolbox is maintained by Sean Polyn and the Vanderbilt Computational Memory Lab, and is designed to support the development and evaluation of models of neurocognitive processes in psychological memory search tasks.  Many people have been involved in the development of this code, both on GitHub and on earlier internally maintained versions.  Currently, the bulk of the toolbox is written in Matlab, but preliminary Python code (very preliminary) can be found within and is under development.  
+
+This toolbox is maintained by Sean Polyn and the Vanderbilt Computational Memory Lab, and is designed to support the development and evaluation of models of neurocognitive processes in psychological memory search tasks.  Many people have been involved in the development of this code, both on GitHub and on earlier internally maintained versions.  Currently, the bulk of the toolbox is written in Matlab, but preliminary Python code (very preliminary) can be found within and is under development.  Reach out if you need help making sense of the code, as the documentation is currently in a rather preliminary state.
 
 Certain analysis functions rely on the Episodic Memory Behavioral Analysis in Matlab toolbox, also hosted on GitHub: vucml/EMBAM.
 
@@ -9,7 +10,7 @@ Certain analysis functions rely on the Episodic Memory Behavioral Analysis in Ma
 * search/ directory contains scripts and functions to do optimization that aren't specific to a particular model
 
 ## Models: CMR-L
-* This is a predictive version of the Context Maintenance and Retrieval (CMR) model of free recall used by Kragel et al. (2015) and based on Polyn et al. (2009).
+* This directory contains both a predictive and generative version of the Context Maintenance and Retrieval (CMR) model of free recall used by Kragel et al. (2015) and based on Polyn et al. (2009).
 * This version is written in Matlab.
 
 ## Models: pyCMR
