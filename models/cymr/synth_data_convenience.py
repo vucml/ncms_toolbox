@@ -27,7 +27,7 @@ def create_expt(patterns, n_subj, n_trials, list_len):
             expt_frame = expt_frame.append(sess_frame)
     return expt_frame
 
-def create_session(patterns, subjid,n_trials,list_len):
+def create_session(patterns, subjid, n_trials, list_len):
     for i in range(n_trials):
         trial_frame = create_list(patterns, subjid, i+1, list_len)
         if i==0:
@@ -37,7 +37,7 @@ def create_session(patterns, subjid,n_trials,list_len):
     return sess_frame
 
 
-def create_list(patterns, subjid,trialnum,list_len):
+def create_list(patterns, subjid, trialnum, list_len):
 
     positions = np.zeros((list_len,),dtype=int)
     indices = np.zeros((list_len,), dtype=int)
