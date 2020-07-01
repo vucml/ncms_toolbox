@@ -30,26 +30,31 @@ synth_study = sdc.create_expt(patterns, n_subj, n_trials, list_len)
 
 model = models.CMRDistributed()
 
+# TODO: add documentation explaining what the parameters do
 param = {'B_enc': 0.7, 'B_rec': 0.5, 'w_loc': 1, 'P1': 8, 'P2': 1, 'T': 0.35,
          'X1':0.001, 'X2': 0.5, 'Dfc': 3, 'Dcf': 1, 'Dff': 0,
          'Lfc': 1, 'Lcf': 1, 'Afc': 0, 'Acf': 0, 'Aff': 0, 'B_start': 0}
 # TODO: add documentation of what this syntax means
 weights = {'fcf': {'loc': 'w_loc'}}
 
+# generate synthetic recall sequences
+# simulates all the study trials created in the synth_study data frame
 sim = model.generate(synth_study, param, patterns=patterns,weights=weights)
 
 # merge the study and recall events
 sim_merged = fr.merge_free_recall(sim)
 
+# serial position curve
 rec_pos = fr.spc(sim_merged)
-
 g = fr.plot_spc(rec_pos)
-# this works on my machine, able to see a nice SPC!
-# TODO: how do I save the figure to disk?
 plt.savefig('temp_spc.pdf')
-#plt.show()
 
 # lag CRP curve
+crp = fr.lag_crp(sim_merged)
+g = fr.plot_lag_crp(crp)
+g.set(ylim=(0, .6))
+plt.savefig('temp_crp.pdf')
+
 
 # Section 3. Using predictive simulations to perform parameter recovery
 
