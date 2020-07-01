@@ -11,8 +11,8 @@ from cymr import network
 import synth_data_convenience as sdc
 
 model_dir = '/Users/polyn/work/cfr'
-patterns_file = os.path.join(model_dir, 'cfr_patterns.hdf5')
-patterns = network.load_patterns(patterns_file)
+#patterns_file = os.path.join(model_dir, 'cfr_patterns.hdf5')
+#patterns = network.load_patterns(patterns_file)
 
 # can we create a synthetic patterns dict, this would be informative
 # a dict, with:
@@ -21,13 +21,19 @@ patterns = network.load_patterns(patterns_file)
 
 # this function creates a pandas dataframe to use for generating
 # synthetic data
-synth_study = sdc.create_expt(20,6,24)
+patterns = sdc.create_patterns(24)
+
+n_subj = 20
+n_trials = 6
+list_len = 24
+synth_study = sdc.create_expt(patterns, n_subj, n_trials, list_len)
 
 model = models.CMRDistributed()
 
 param = {'B_enc': 0.7, 'B_rec': 0.5, 'w_loc': 1, 'P1': 8, 'P2': 1, 'T': 0.35,
          'X1':0.001, 'X2': 0.5, 'Dfc': 3, 'Dcf': 1, 'Dff': 0,
          'Lfc': 1, 'Lcf': 1, 'Afc': 0, 'Acf': 0, 'Aff': 0, 'B_start': 0}
+# TODO: add documentation of what this syntax means
 weights = {'fcf': {'loc': 'w_loc'}}
 
 sim = model.generate(synth_study, param, patterns=patterns,weights=weights)
