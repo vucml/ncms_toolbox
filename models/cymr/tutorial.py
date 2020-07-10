@@ -109,6 +109,12 @@ param['dynamic'] = {'recall': {'B_rec': ['hcmp']}}
 # now the B_rec parameter will vary from recall event to recall event
 # controlled by the values in the 'hcmp' column of the data structure
 
+# in order to run generative simulations with a dynamic recall parameter
+# we need to generate max_recalls potential synthetic values for each list
+# does this require a specialty generate function?
+
+sim = model.generate_dynamic(synth_study, param, patterns=patterns, weights=weights)
+
 logl, n = model.likelihood(synth_data, param,
                            patterns=patterns, weights=weights)
 print(logl)
