@@ -19,9 +19,6 @@ import synth_data_convenience as sdc
 # gen_dynamic = {'recall': {'B_rec': 'clip(B_rec + random.randn() * neural_scaling, 0, 1)'}}
 # tester_dynam = parameters.set_dynamic(tester_fixed, tester_rec, gen_dynamic['recall'])
 
-# is this still needed, used for anything?
-# model_dir = '/Users/polyn/work/cfr'
-
 param_def = parameters.Parameters()
 # param_def.add_fixed(B_enc=0.5)
 # param_def.fixed['B_enc']
@@ -42,9 +39,12 @@ model = cmr.CMRDistributed()
 
 # define the parameters
 # TODO: add documentation explaining what the parameters do
-param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5, 'w_loc': 1, 'P1': 8, 'P2': 1, 'T': 0.35,
-                   'X1': 0.001, 'X2': 0.5, 'Dfc': 3, 'Dcf': 1, 'Dff': 0,
-                   'Lfc': 1, 'Lcf': 1, 'Afc': 0, 'Acf': 0, 'Aff': 0, 'B_start': 0}
+param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5,
+                   'w_loc': 1, 'P1': 8, 'P2': 1,
+                   'T': 0.35, 'X1': 0.001, 'X2': 0.5,
+                   'Dfc': 3, 'Dcf': 1, 'Dff': 0,
+                   'Lfc': 1, 'Lcf': 1, 'Afc': 0,
+                   'Acf': 0, 'Aff': 0, 'B_start': 0}
 # specify what kind of weights will be used
 # TODO: add documentation of what this syntax means
 param_def.weights = {'fcf': {'loc': 'w_loc'}}
@@ -54,9 +54,11 @@ param_def.weights = {'fcf': {'loc': 'w_loc'}}
 
 # generate synthetic recall sequences
 # simulates all the study trials created in the synth_study data frame
+# sim is a dataframe containing both study and recall events
 sim = model.generate(synth_study, param_def, patterns=patterns, weights=param_def.weights)
 
-# what is the likelihood
+# calculate the likelihood of the model defined by param_def (and model code)
+# given the data in sim (produced by this very same model)
 logl, n = model.likelihood(sim, param_def, patterns=patterns, weights=param_def.weights)
 
 # merge the study and recall events in preparation for analysis
@@ -84,8 +86,8 @@ plt.savefig('temp_crp.pdf')
 param_sweep = parameters.Parameters()
 param_sweep.fixed = param_def.fixed.copy()
 param_sweep.weights = param_def.weights.copy()
-B_rec_vals = np.linspace(0,1,11)
-logl_vals = np.zeros((len(B_rec_vals),),dtype=float)
+B_rec_vals = np.linspace(0, 1, 11)
+logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
     param_sweep.fixed['B_rec'] = B_rec_vals[i]
     logl, n = model.likelihood(sim, param_sweep,
@@ -93,10 +95,10 @@ for i in range(len(B_rec_vals)):
     logl_vals[i] = logl
 
 # demonstrate that the best-fitting value matches the generating value
-#fig, ax = plt.subplot()
+# fig, ax = plt.subplot()
 plt.clf()
 plt.plot(B_rec_vals, logl_vals)
-plt.plot([0.5, 0.5],[plt.ylim()[0], plt.ylim()[1]])
+plt.plot([0.5, 0.5], [plt.ylim()[0], plt.ylim()[1]])
 plt.xlabel('beta rec value')
 plt.ylabel('log likelihood')
 plt.savefig('B_rec_recovery.pdf')
@@ -127,17 +129,28 @@ synth_study2 = synth_study2.assign(hcmp=pd.Series(var_signal).values)
 
 # if you want a dynamic recall param, but do not need to recover the sequence of random numbers:
 # gen_dynamic = {'recall': {'B_rec': 'clip(B_rec + random.randn() * neural_scaling, 0, 1)'}}
+# this tells the code that the synthetic neural signal (the 'hcmp' column on the data structure)
+# is attached to the study events. Generative simulations create recall events, so they don't
+# take recall events as inputs. For this version of the model we aren't allowing errors,
+# so the max number of recall events is the same as the number of study events.
+# As such, if you have a generative simulation with a dynamic parameter that changes
+# from recall event to recall event, and requires externally provided values,
+# the dynamic parameter evaluation code will check the study structure for those
+# values. It will use 'position' on the study events to reference output position of
+# the recall events.
 data_keys = {'study': ['hcmp'], 'recall': []}
 dyn_sim = model.generate(synth_study2, param_def, patterns=patterns,
                          weights=param_def.weights, data_keys=data_keys)
 
-# I think need custom code here to grab the 'hcmp' value used to generate each
-# recall event. I think existing merge code will take the hcmp val from the
-# corresponding recalled item but:
-# we want the value from the serial position == this output position
-# dsh short for dyn_sim_hcmp
+# dyn_sim is a data structure containing study events and recall events.
+# As described above, the dynamic 'B_rec' parameter values fluctuate during recall
+# but the synthetic 'hcmp' neural signal was specified as a column on
+# the study events.  The custom code below iterates through the recall
+# events, finds the corresponding study event, and copies over the 'hcmp' value.
+
+# dsh: Dynamic-parameter Simulation with synthetic Hippocampal activity
 dsh = dyn_sim.copy()
-# iterate over dyn_sim, alter dsh?
+# iterate over dyn_sim, alter dsh
 for index, row in dyn_sim.iterrows():
     # print('hi')
     if row['trial_type']=='recall':
@@ -151,16 +164,41 @@ for index, row in dyn_sim.iterrows():
         # mask should return a single value
         val = dyn_sim['hcmp'][mask]
         dsh.loc[index,('hcmp')] = val.to_numpy()[0]
-        # print('hi')
-        # dyn_sim[mask]['hcmp']
 
-print('hi')
-
-#print(logl)
-
-# dsh contains data structure with synthetic neural values on the recall events
+# dsh now is a data structure with synthetic neural values on the recall events
 # demonstrate how lag-CRP is different for recall events with low vs high temporal
 # reinstatement
+
+# get the data structure ready for behavioral analysis with psifr package
+dsh_merged = fr.merge_free_recall(dsh, recall_keys=['hcmp'])
+
+# lag-CRP curve for all recall transitions
+crp = fr.lag_crp(dsh_merged)
+g = fr.plot_lag_crp(crp)
+g.set(ylim=(0, .6))
+plt.savefig('dsh_overall_crp.pdf')
+
+# here we tell the lag_crp function that we want it to keep track of the
+# hcmp field on the data, and keep this associated with the items being
+# transitioned between.  Then we define a test function using the lambda
+# keyword.  Here, x and y correspond to the identities of the 2 items being
+# transitioned between.  Every transition has an item you are coming from (x)
+# and an item you are going to (y).  Here we only need to test the hcmp value
+# associated with x, so we are only including transitions where the 'from' item
+# has a low value of temporal reinstatement.
+lo_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
+g = fr.plot_lag_crp(lo_crp)
+g.set(ylim=(0, .6))
+plt.savefig('dsh_low_hcmp_crp.pdf')
+
+# this just changes the test to only include transitions where the 'from' item
+# has a high value of temporal reinstatement.
+hi_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
+g = fr.plot_lag_crp(hi_crp)
+g.set(ylim=(0, .6))
+plt.savefig('dsh_high_hcmp_crp.pdf')
+
+print('hi')
 
 # Section 5. Predictive simulations given the data from the model
 # with variable temporal reinstatement.
