@@ -109,18 +109,22 @@ plt.savefig('B_rec_recovery.pdf')
 
 # sim contains study events and recall events created by our generative simulation
 # trial_type says which is which
-synth_study2 = synth_study.copy()
-# strip off the recall events
-# synth_data = synth_data.loc[synth_data['trial_type']=='study']
-# we will use param_def from above, but make some modifications
-param_def.fixed['neural_scaling'] = 0.1
-
-param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
+# synth_study2 = synth_study.copy()
+synth_study2 = sdc.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
 
 # make the synthetic neural values for the hcmp data column
 # it will get added to baseline val, scaled, and clipped within the code
+# this adds to both study and recall events but only the recall events get used
 var_signal = np.random.randn(synth_study2.shape[0])
 synth_study2 = synth_study2.assign(hcmp=pd.Series(var_signal).values)
+
+# strip off the recall events
+# synth_data = synth_data.loc[synth_data['trial_type']=='study']
+# we will use param_def from above, but make some modifications
+param_def.fixed['neural_scaling'] = 0.2
+
+param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
+
 # now the B_rec parameter will vary from recall event to recall event
 # controlled by the values in the 'hcmp' column of the data structure
 
@@ -138,9 +142,20 @@ synth_study2 = synth_study2.assign(hcmp=pd.Series(var_signal).values)
 # the dynamic parameter evaluation code will check the study structure for those
 # values. It will use 'position' on the study events to reference output position of
 # the recall events.
-data_keys = {'study': ['hcmp'], 'recall': []}
+
+# Neal raised the point that this is an awkward way to control dynamic recall
+# parameters. Alternative could be to create dummy recall events that are part
+# of the data structure first argument to model.generate.  Then generate_subject
+# could have an optional input keyword argument recall_data=None.  If it is
+# None, the code operates as it does presently.  If recall_data exists, it would be
+# converted to list format like study events, and consulted when a dynamic recall
+# parameter exists
+
+# data_keys = {'study': [], 'recall': ['hcmp']}
+data_keys = {'recall': ['hcmp']}
 dyn_sim = model.generate(synth_study2, param_def, patterns=patterns,
-                         weights=param_def.weights, data_keys=data_keys)
+                         weights=param_def.weights, data_keys=data_keys,
+                         n_rep=2)
 
 # dyn_sim is a data structure containing study events and recall events.
 # As described above, the dynamic 'B_rec' parameter values fluctuate during recall
@@ -150,24 +165,32 @@ dyn_sim = model.generate(synth_study2, param_def, patterns=patterns,
 
 # dsh: Dynamic-parameter Simulation with synthetic Hippocampal activity
 dsh = dyn_sim.copy()
-# iterate over dyn_sim, alter dsh
+
+# When you run the generative simulation with a dynamic recall parameter
+# you lose the hcmp field.  This code copies over the hcmp value from the original
+# set of dummy recalls (on synth_study2)
+
 for index, row in dyn_sim.iterrows():
-    # print('hi')
+
     if row['trial_type']=='recall':
-        # filter to get the study event with this
+        # filter to get the dummy recall event with this
         # subject, list, position
-        m1 = dyn_sim['subject']==row['subject']
-        m2 = dyn_sim['list']==row['list']
-        m3 = dyn_sim['trial_type']=='study'
-        m4 = dyn_sim['position']==row['position']
+
+        m1 = synth_study2['subject']==row['subject']
+        m2 = synth_study2['list']==row['list']
+        m3 = synth_study2['trial_type']=='recall'
+        m4 = synth_study2['position']==row['position']
         mask = m1 & m2 & m3 & m4
         # mask should return a single value
-        val = dyn_sim['hcmp'][mask]
+        val = synth_study2['hcmp'][mask]
         dsh.loc[index,('hcmp')] = val.to_numpy()[0]
 
 # dsh now is a data structure with synthetic neural values on the recall events
 # demonstrate how lag-CRP is different for recall events with low vs high temporal
 # reinstatement
+
+# currently getting identical CRPs, whereas previously was getting substantial CRP differences
+# I think I broke something
 
 # get the data structure ready for behavioral analysis with psifr package
 dsh_merged = fr.merge_free_recall(dsh, recall_keys=['hcmp'])
@@ -214,6 +237,11 @@ logl, n = model.likelihood(dsh, param_def, patterns=patterns,
                            weights=param_def.weights, data_keys=data_keys)
 
 # distort the original neural fluctuations so they no longer match
+# this is literally adding random normal deviates to the signal used
+# to create the original behavioral data
+# original signal is in var_signal variable
+scale_distortion = 0.1
+distortion = np.random.randn(var_signal.shape[0]) * scale_distortion
 
 # try different values of neural_scaling parameter to see which gives best fit
 

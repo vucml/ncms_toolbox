@@ -25,6 +25,7 @@ param = {'B_enc': 0.7, 'B_rec': 0.5, 'w_loc': 1, 'P1': 8, 'P2': 1, 'T': 0.35,
          'Lfc': 1, 'Lcf': 1, 'Afc': 0, 'Acf': 0, 'Aff': 0, 'B_start': 0}
 weights = {'fcf': {'loc': 'w_loc'}}
 
+free = {'B_enc', }
 
 A = 5
 b = 10
@@ -88,6 +89,7 @@ out_rt = clean_rec[['output','rt']].groupby('output').mean()
 plt.plot(out_rt)
 plt.show()
 
+# try fitting
 
 
 print('hi')

@@ -18,18 +18,18 @@ def create_patterns(pool_size):
                 'vector': localist_dict}
     return patterns
 
-def create_expt(patterns, n_subj, n_trials, list_len):
+def create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=False):
     for i in range(n_subj):
-        sess_frame = create_session(patterns, i+1, n_trials, list_len)
+        sess_frame = create_session(patterns, i+1, n_trials, list_len, dummy_recalls)
         if i==0:
             expt_frame = sess_frame.copy()
         else:
             expt_frame = expt_frame.append(sess_frame)
     return expt_frame
 
-def create_session(patterns, subjid, n_trials, list_len):
+def create_session(patterns, subjid, n_trials, list_len, dummy_recalls):
     for i in range(n_trials):
-        trial_frame = create_list(patterns, subjid, i+1, list_len)
+        trial_frame = create_list(patterns, subjid, i+1, list_len, dummy_recalls)
         if i==0:
             sess_frame = trial_frame.copy()
         else:
@@ -37,7 +37,7 @@ def create_session(patterns, subjid, n_trials, list_len):
     return sess_frame
 
 
-def create_list(patterns, subjid, trialnum, list_len):
+def create_list(patterns, subjid, trialnum, list_len, dummy_recalls):
 
     positions = np.zeros((list_len,),dtype=int)
     indices = np.zeros((list_len,), dtype=int)
@@ -47,7 +47,7 @@ def create_list(patterns, subjid, trialnum, list_len):
         indices[i] = i
         item_names[i] = patterns['items'][i]
 
-    trial_frame = pd.DataFrame({
+    study_frame = pd.DataFrame({
         'subject': np.ones((list_len,),dtype=int) * subjid,
         'list': np.ones((list_len,),dtype=int) * trialnum,
         'trial_type': ['study'] * list_len,
@@ -55,6 +55,19 @@ def create_list(patterns, subjid, trialnum, list_len):
         'item_index': indices,
         'item': item_names
     })
+
+    if dummy_recalls:
+        recall_frame = pd.DataFrame({
+            'subject': np.ones((list_len,),dtype=int) * subjid,
+            'list': np.ones((list_len,),dtype=int) * trialnum,
+            'trial_type': ['recall'] * list_len,
+            'position': positions,
+            'item_index': indices,
+            'item': item_names
+        })
+        trial_frame = study_frame.append(recall_frame)
+    else:
+        trial_frame = study_frame
 
     return trial_frame
 
