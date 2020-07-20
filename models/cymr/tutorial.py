@@ -11,33 +11,29 @@ from cymr import network
 
 import synth_data_convenience as sdc
 
-# Section 1.  Setting model parameters and task details
-
-# This works!
-# tester_fixed = {'B_rec': 0.5, 'PX': 8, 'neural_scaling': 0.1}
-# tester_rec = {'input': np.array([0, 1, 2], dtype=int)}
-# gen_dynamic = {'recall': {'B_rec': 'clip(B_rec + random.randn() * neural_scaling, 0, 1)'}}
-# tester_dynam = parameters.set_dynamic(tester_fixed, tester_rec, gen_dynamic['recall'])
+# SECTION 1.  Setting model parameters and task details
 
 param_def = parameters.Parameters()
-# param_def.add_fixed(B_enc=0.5)
-# param_def.fixed['B_enc']
 
-# first we create a set of synthetic patterns corresponding to the
-# set of items that will be on a study list
+# this helper function creates a set of synthetic patterns corresponding
+# to the pool of potential study items
 patterns = sdc.create_patterns(24)
 
-# create a pandas dataframe with a set of synthetic study events,
-# these will be used to generate synthetic recall sequences
+# this helper function creates a pandas dataframe describing a set of synthetic study events,
+# these will be used to guide a simulation that will generate synthetic recall sequences
 n_subj = 20
 n_trials = 6
 list_len = 24
 synth_study = sdc.create_expt(patterns, n_subj, n_trials, list_len)
 
-# create the model
+# create the model using the CMR-Distributed module
 model = cmr.CMRDistributed()
 
-# define the parameters
+# create a parameter definitions object
+param_def = parameters.Parameters()
+# set the model parameters to reasonable values
+# B_enc: ...
+# B_rec: ...
 # TODO: add documentation explaining what the parameters do
 param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5,
                    'w_loc': 1, 'P1': 8, 'P2': 1,
@@ -45,44 +41,64 @@ param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5,
                    'Dfc': 3, 'Dcf': 1, 'Dff': 0,
                    'Lfc': 1, 'Lcf': 1, 'Afc': 0,
                    'Acf': 0, 'Aff': 0, 'B_start': 0}
-# specify what kind of weights will be used
-# TODO: add documentation of what this syntax means
+
+# this weights dictionary is used to specify how to set up the weighted connections
+# between units in the model.  Here, fcf is shorthand for the two weight matrices
+# projecting from the feature (f) layer to the context layer (c), and back again
+# i.e. fc refers to the feature-to-context projection, and cf refers to the
+# context-to-feature projection.
+# 'loc' means we are using localist representations for the studied items, aka
+# orthonormal vectors, aka unit vectors
 param_def.weights = {'fcf': {'loc': 'w_loc'}}
 
-# Section 2.  Generating synthetic data and plotting summary
+# SECTION 2.  Generating synthetic data and plotting summary
 # statistics from the data
 
-# generate synthetic recall sequences
-# simulates all the study trials created in the synth_study data frame
-# sim is a dataframe containing both study and recall events
+# The generate function is used to generate synthetic recall sequences.
+# Each row in the synth_study dataframe describes a study event (the presentation
+# of a to-be-remembered word). The code iterates through these to simulate an experiment.
+# The generate function returns 'sim', a dataframe containing the original study events,
+# and model-generated recall events.
 sim = model.generate(synth_study, param_def, patterns=patterns, weights=param_def.weights)
 
-# calculate the likelihood of the model defined by param_def (and model code)
-# given the data in sim (produced by this very same model)
+# The likelihood function takes a set of study and recall events and determines
+# how likely it is that the model defined by param_def (and the model code) generated
+# that set of recall events.  I.e., what is the likelihood of these data given this model?
+# This is a best-case scenario of sorts, in that the model being evaluated actually
+# literally did generate these data.
 logl, n = model.likelihood(sim, param_def, patterns=patterns, weights=param_def.weights)
 
-# merge the study and recall events in preparation for analysis
+# This tutorial uses the psifr package to carry out basic behavioral analysis of the
+# free-recall data. The dataframes produced by the models in the cymr package are
+# designed to work with psifr. This merge_free_recall function does some
+# pre-processing of the dataframe necessary for the psifr functions. In brief, if a
+# particular study item is later recalled, the same event can contain information about
+# both the original study event and the recall event (they've been merged into the
+# same event)
 sim_merged = fr.merge_free_recall(sim)
 
-# serial position curve
+# calculate probability of recall as a function of serial position
+# plot a serial position curve, and save it to disk
 rec_pos = fr.spc(sim_merged)
 g = fr.plot_spc(rec_pos)
 plt.savefig('temp_spc.pdf')
 
-# lag-CRP curve
+# calculate likelihood of a recall transition of a particular lag-distance
+# plot a lag-CRP curve, and save it to disk
 crp = fr.lag_crp(sim_merged)
 g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
 plt.savefig('temp_crp.pdf')
 
 
-# Section 3. Using predictive simulations to perform parameter recovery
-# A simple test of parameter recovery.
-# create 11 model variants with different values of
-# beta rec, which controls temporal reinstatement
-# evaluate likelihood of the synthetic data for each model variant
+# SECTION 3. Using predictive simulations to perform parameter recovery.
+# A simple demonstration of parameter recovery.
+# The code creates 11 model variants with different values of
+# B_rec ("beta rec"), which controls temporal reinstatement.
+# The code evaluates the likelihood of the synthetic data for each model variant
 
 # parameter sweep B_rec
+# make a copy of the parameter definitions object
 param_sweep = parameters.Parameters()
 param_sweep.fixed = param_def.fixed.copy()
 param_sweep.weights = param_def.weights.copy()
@@ -91,11 +107,12 @@ logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
     param_sweep.fixed['B_rec'] = B_rec_vals[i]
     logl, n = model.likelihood(sim, param_sweep,
-                               patterns=patterns, weights=param_sweep.weights)
+                               patterns=patterns,
+                               weights=param_sweep.weights)
     logl_vals[i] = logl
 
-# demonstrate that the best-fitting value matches the generating value
-# fig, ax = plt.subplot()
+# This figure demonstrates that the best-fitting model (largest likelihood value)
+# has a B_rec parameter value that matches B_rec of the generating model
 plt.clf()
 plt.plot(B_rec_vals, logl_vals)
 plt.plot([0.5, 0.5], [plt.ylim()[0], plt.ylim()[1]])
@@ -103,97 +120,82 @@ plt.xlabel('beta rec value')
 plt.ylabel('log likelihood')
 plt.savefig('B_rec_recovery.pdf')
 
-# Section 4. Creating synthetic neural data and linking it to the
-# temporal context reinstatement process.  Generating synthetic
-# behavioral data using this 'neural' model.
+# SECTION 4. Creating synthetic neural data and creating a neural linking parameter
+# that allows the neural data to control the model's temporal context reinstatement
+# process.  First we generate synthetic behavioral data using this 'neurally informed'
+# model.
 
-# sim contains study events and recall events created by our generative simulation
-# trial_type says which is which
-# synth_study2 = synth_study.copy()
-synth_study2 = sdc.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
+# The helper function has an option to create a set of dummy recall events.
+# This model can only produce as many recall events as there were study events (as it
+# is a simplified model that does not make repeats or intrusion errors).  We will create
+# synthetic neural signal for each dummy recall event, then our generative simulation will
+# use these synthetic neural signals during recall-sequence generation.
+# ndf = 'neural data frame'
+ndf = sdc.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
 
-# make the synthetic neural values for the hcmp data column
-# it will get added to baseline val, scaled, and clipped within the code
-# this adds to both study and recall events but only the recall events get used
-var_signal = np.random.randn(synth_study2.shape[0])
-synth_study2 = synth_study2.assign(hcmp=pd.Series(var_signal).values)
+# We simulate the neural signal as a stochastic process producing values
+# drawn from a normal distribution with mean = 0 and stdev = 1.
+var_signal = np.random.randn(ndf.shape[0])
+# then we create a column on the dataframe called 'hcmp' (short
+# for hippocampus)
+ndf = ndf.assign(hcmp=pd.Series(var_signal).values)
+# for these simulations we only want to keep the values associated with
+# the recall events, can set the hcmp values for study events to be 'missing'
+ndf.loc[ndf['trial_type']=='study', 'hcmp'] = np.nan
 
-# strip off the recall events
-# synth_data = synth_data.loc[synth_data['trial_type']=='study']
 # we will use param_def from above, but make some modifications
+# we add a neural scaling parameter
 param_def.fixed['neural_scaling'] = 0.2
+
+# then we define a dynamic parameter
+
+# the 'recall' key specifies that this dynamic parameter changes with each
+# recall event.  The 'B_rec' key specifies which parameter will be updated.
+# The set_dynamic_param code will evaluate the string, using the numpy
+# namespace and the namespace of the parameters defined in param_def.fixed.
+# The stochastic hcmp values are scaled and added to B_rec, and the resultant
+# value is bounded at 0 and 1 (because the B_rec parameter is limited to this
+# range).
+
+# syntax for 'dynamic' dict structure:
+# {update phase: {param name: string to be evaluated}}
 
 param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
 
 # now the B_rec parameter will vary from recall event to recall event
 # controlled by the values in the 'hcmp' column of the data structure
 
-# syntax for 'dynamic' dict structure:
-# {update phase: {param name: [data column, optional args]}}
-
-# if you want a dynamic recall param, but do not need to recover the sequence of random numbers:
-# gen_dynamic = {'recall': {'B_rec': 'clip(B_rec + random.randn() * neural_scaling, 0, 1)'}}
-# this tells the code that the synthetic neural signal (the 'hcmp' column on the data structure)
-# is attached to the study events. Generative simulations create recall events, so they don't
-# take recall events as inputs. For this version of the model we aren't allowing errors,
-# so the max number of recall events is the same as the number of study events.
-# As such, if you have a generative simulation with a dynamic parameter that changes
-# from recall event to recall event, and requires externally provided values,
-# the dynamic parameter evaluation code will check the study structure for those
-# values. It will use 'position' on the study events to reference output position of
-# the recall events.
-
-# Neal raised the point that this is an awkward way to control dynamic recall
-# parameters. Alternative could be to create dummy recall events that are part
-# of the data structure first argument to model.generate.  Then generate_subject
-# could have an optional input keyword argument recall_data=None.  If it is
-# None, the code operates as it does presently.  If recall_data exists, it would be
-# converted to list format like study events, and consulted when a dynamic recall
-# parameter exists
-
-# data_keys = {'study': [], 'recall': ['hcmp']}
+# this tells the generate function to preserve the 'hcmp' column on the events dataframe
+# and that the relevant values are the ones defined for recall events
 data_keys = {'recall': ['hcmp']}
-dyn_sim = model.generate(synth_study2, param_def, patterns=patterns,
+
+# n_rep controls how much data is generated, e.g.
+# n_rep=2 tells it to generate 2x as much data as in the dataframe provided
+dyn_sim = model.generate(ndf, param_def, patterns=patterns,
                          weights=param_def.weights, data_keys=data_keys,
-                         n_rep=2)
+                         n_rep=1)
 
 # dyn_sim is a data structure containing study events and recall events.
-# As described above, the dynamic 'B_rec' parameter values fluctuate during recall
-# but the synthetic 'hcmp' neural signal was specified as a column on
-# the study events.  The custom code below iterates through the recall
-# events, finds the corresponding study event, and copies over the 'hcmp' value.
+# but the model code doesn't know to report the 'hcmp' value back out, so
+# we will have to copy it over from the ndf dataframe
 
-# dsh: Dynamic-parameter Simulation with synthetic Hippocampal activity
-dsh = dyn_sim.copy()
+# to identify a recall event, subject, list, trial_type, position
+for index, row in ndf.iterrows():
+    if row.trial_type == 'recall':
+        # find the corresponding row or rows in dyn_sim (rows if n_rep > 1)
+        mask = (dyn_sim.subject==row.subject) & \
+               (dyn_sim.list==row.list) & \
+               (dyn_sim.position==row.position)
+        dyn_sim.loc[mask, 'hcmp'] = row.hcmp
 
-# When you run the generative simulation with a dynamic recall parameter
-# you lose the hcmp field.  This code copies over the hcmp value from the original
-# set of dummy recalls (on synth_study2)
-
-for index, row in dyn_sim.iterrows():
-
-    if row['trial_type']=='recall':
-        # filter to get the dummy recall event with this
-        # subject, list, position
-
-        m1 = synth_study2['subject']==row['subject']
-        m2 = synth_study2['list']==row['list']
-        m3 = synth_study2['trial_type']=='recall'
-        m4 = synth_study2['position']==row['position']
-        mask = m1 & m2 & m3 & m4
-        # mask should return a single value
-        val = synth_study2['hcmp'][mask]
-        dsh.loc[index,('hcmp')] = val.to_numpy()[0]
-
-# dsh now is a data structure with synthetic neural values on the recall events
+# dyn_sim.loc[mask, 'hcmp'] = this_val
 # demonstrate how lag-CRP is different for recall events with low vs high temporal
 # reinstatement
 
-# currently getting identical CRPs, whereas previously was getting substantial CRP differences
-# I think I broke something
-
 # get the data structure ready for behavioral analysis with psifr package
-dsh_merged = fr.merge_free_recall(dsh, recall_keys=['hcmp'])
+# recall_keys here is used like data_keys['recall'] above (it tells psifr to
+# preserve the 'hcmp' column for recall events).
+dsh_merged = fr.merge_free_recall(dyn_sim, recall_keys=['hcmp'])
 
 # lag-CRP curve for all recall transitions
 crp = fr.lag_crp(dsh_merged)
@@ -201,14 +203,12 @@ g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
 plt.savefig('dsh_overall_crp.pdf')
 
-# here we tell the lag_crp function that we want it to keep track of the
-# hcmp field on the data, and keep this associated with the items being
-# transitioned between.  Then we define a test function using the lambda
-# keyword.  Here, x and y correspond to the identities of the 2 items being
-# transitioned between.  Every transition has an item you are coming from (x)
-# and an item you are going to (y).  Here we only need to test the hcmp value
-# associated with x, so we are only including transitions where the 'from' item
-# has a low value of temporal reinstatement.
+# Here we conditionalize the lag-CRP to filter recall transitions based on the
+# value of 'hcmp'. We define a test function using the lambda keyword.  Here,
+# x and y correspond to the identities of the 2 items being transitioned between.
+# Every transition has an item you are coming from (x) and an item you are going
+# to (y). The (x < -0.5) statement will cause the analysis to only include
+# transitions where the 'from' item has a low value for temporal reinstatement.
 lo_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
 g = fr.plot_lag_crp(lo_crp)
 g.set(ylim=(0, .6))
@@ -221,25 +221,23 @@ g = fr.plot_lag_crp(hi_crp)
 g.set(ylim=(0, .6))
 plt.savefig('dsh_high_hcmp_crp.pdf')
 
-print('hi')
 
-# Section 5. Predictive simulations given the data from the model
-# with variable temporal reinstatement.
+# SECTION 5. Running predictive simulations given the data created by the
+# model with temporal reinstatement (B_rec) that varies across recall events.
 
 # calculate likelihood under perfect case where B_rec fluctuations perfectly
-# match what was used to create synthetic data
+# match what was used to create the synthetic data
 
-# calculate the likelihood
-# 'hcmp' becomes a recall_key
+# 'hcmp' is a recall_key
 data_keys = {'study': [], 'recall': ['hcmp']}
-print('hi')
-logl, n = model.likelihood(dsh, param_def, patterns=patterns,
+
+logl, n = model.likelihood(dyn_sim, param_def, patterns=patterns,
                            weights=param_def.weights, data_keys=data_keys)
 
 # distort the original neural fluctuations so they no longer match
 # this is literally adding random normal deviates to the signal used
 # to create the original behavioral data
-# original signal is in var_signal variable
+# original signal is in the var_signal variable
 scale_distortion = 0.1
 distortion = np.random.randn(var_signal.shape[0]) * scale_distortion
 
