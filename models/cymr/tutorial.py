@@ -98,6 +98,7 @@ plt.savefig('temp_crp.pdf')
 # The code evaluates the likelihood of the synthetic data for each model variant
 
 # parameter sweep B_rec
+print('running parameter sweep over B_rec')
 # make a copy of the parameter definitions object
 param_sweep = parameters.Parameters()
 param_sweep.fixed = param_def.fixed.copy()
@@ -110,6 +111,8 @@ for i in range(len(B_rec_vals)):
                                patterns=patterns,
                                weights=param_sweep.weights)
     logl_vals[i] = logl
+    print('*', end='')
+print('')
 
 # This figure demonstrates that the best-fitting model (largest likelihood value)
 # has a B_rec parameter value that matches B_rec of the generating model
@@ -133,15 +136,13 @@ plt.savefig('B_rec_recovery.pdf')
 # ndf = 'neural data frame'
 ndf = sdc.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
 
+# we create a column on the dataframe called 'hcmp' (short for hippocampus)
+ndf = ndf.assign(hcmp=np.nan)
+these_entries = ndf.loc[(ndf.trial_type=='recall'), 'hcmp']
 # We simulate the neural signal as a stochastic process producing values
 # drawn from a normal distribution with mean = 0 and stdev = 1.
-var_signal = np.random.randn(ndf.shape[0])
-# then we create a column on the dataframe called 'hcmp' (short
-# for hippocampus)
-ndf = ndf.assign(hcmp=pd.Series(var_signal).values)
-# for these simulations we only want to keep the values associated with
-# the recall events, can set the hcmp values for study events to be 'missing'
-ndf.loc[ndf['trial_type']=='study', 'hcmp'] = np.nan
+signal = np.random.randn(these_entries.shape[0])
+ndf.loc[(ndf.trial_type=='recall'), 'hcmp'] = signal
 
 # we will use param_def from above, but make some modifications
 # we add a neural scaling parameter
@@ -169,14 +170,14 @@ param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0,
 # and that the relevant values are the ones defined for recall events
 data_keys = {'recall': ['hcmp']}
 
-# n_rep controls how much data is generated, e.g.
+# n_rep (number of repetitions) controls how much data is generated, e.g.
 # n_rep=2 tells it to generate 2x as much data as in the dataframe provided
 dyn_sim = model.generate(ndf, param_def, patterns=patterns,
                          weights=param_def.weights, data_keys=data_keys,
                          n_rep=1)
 
 # dyn_sim is a data structure containing study events and recall events.
-# but the model code doesn't know to report the 'hcmp' value back out, so
+# but the model code doesn't pass the 'hcmp' value back out, so
 # we will have to copy it over from the ndf dataframe
 
 # to identify a recall event, subject, list, trial_type, position
@@ -185,18 +186,19 @@ for index, row in ndf.iterrows():
         # find the corresponding row or rows in dyn_sim (rows if n_rep > 1)
         mask = (dyn_sim.subject==row.subject) & \
                (dyn_sim.list==row.list) & \
-               (dyn_sim.position==row.position)
+               (dyn_sim.position==row.position) & \
+               (dyn_sim.trial_type=='recall')
         dyn_sim.loc[mask, 'hcmp'] = row.hcmp
 
-# dyn_sim.loc[mask, 'hcmp'] = this_val
-# demonstrate how lag-CRP is different for recall events with low vs high temporal
-# reinstatement
+# demonstrate how lag-CRP is different for recall events with
+# low vs high temporal reinstatement
 
 # get the data structure ready for behavioral analysis with psifr package
 # recall_keys here is used like data_keys['recall'] above (it tells psifr to
 # preserve the 'hcmp' column for recall events).
 dsh_merged = fr.merge_free_recall(dyn_sim, recall_keys=['hcmp'])
 
+print('running lag-CRP analyses')
 # lag-CRP curve for all recall transitions
 crp = fr.lag_crp(dsh_merged)
 g = fr.plot_lag_crp(crp)
@@ -208,14 +210,14 @@ plt.savefig('dsh_overall_crp.pdf')
 # x and y correspond to the identities of the 2 items being transitioned between.
 # Every transition has an item you are coming from (x) and an item you are going
 # to (y). The (x < -0.5) statement will cause the analysis to only include
-# transitions where the 'from' item has a low value for temporal reinstatement.
+# transitions where the 'from' item has a low value for hcmp / temporal reinstatement.
 lo_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
 g = fr.plot_lag_crp(lo_crp)
 g.set(ylim=(0, .6))
 plt.savefig('dsh_low_hcmp_crp.pdf')
 
 # this just changes the test to only include transitions where the 'from' item
-# has a high value of temporal reinstatement.
+# has a high value of hcmp / temporal reinstatement.
 hi_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
 g = fr.plot_lag_crp(hi_crp)
 g.set(ylim=(0, .6))
@@ -228,64 +230,181 @@ plt.savefig('dsh_high_hcmp_crp.pdf')
 # calculate likelihood under perfect case where B_rec fluctuations perfectly
 # match what was used to create the synthetic data
 
-# 'hcmp' is a recall_key
+# 'hcmp' is a recall_key, as described above
 data_keys = {'study': [], 'recall': ['hcmp']}
 
 logl, n = model.likelihood(dyn_sim, param_def, patterns=patterns,
                            weights=param_def.weights, data_keys=data_keys)
 
-# distort the original neural fluctuations so they no longer match
-# this is literally adding random normal deviates to the signal used
-# to create the original behavioral data
-# original signal is in the var_signal variable
-scale_distortion = 0.1
-distortion = np.random.randn(var_signal.shape[0]) * scale_distortion
+# We used a synthetic neural signal to influence a cognitive process
+# in the CMR model.  Now, we imagine a scenario in which we don't have
+# access to the 'true' signal, but rather only have access to a noisy
+# version of the signal.
 
-# try different values of neural_scaling parameter to see which gives best fit
+# In other words, we will distort the original neural fluctuations so
+# they no longer perfectly match the fluctuations used to generate the
+# data. The noisy signal is a weighted average of the original neural
+# values and the noise values.
+
+# dndf: (d)ynamic-recall-parameter with (n)oise (d)ata(f)rame
+dndf = dyn_sim.copy()
+
+# weighted mean of original value and noise value
+# 0.0 would mean no contribution of noise
+# 1.0 would mean no contribution of original signal
+noise_weight = 0.5
+
+hcmp_rec = dyn_sim.loc[(dyn_sim.trial_type=='recall'), 'hcmp']
+noise = np.random.randn(hcmp_rec.shape[0])
+noisy_vals = (hcmp_rec * (1-noise_weight)) + (noise * noise_weight)
+dndf.loc[(dndf.trial_type=='recall'), 'hcmp'] = noisy_vals
 
 # sweep over neural scaling and B_rec base values
+dnparam = parameters.Parameters()
+# start with the same default parameters we defined in section 1
+dnparam.fixed = param_def.fixed.copy()
+dnparam.weights = param_def.weights.copy()
+dnparam.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
+data_keys = {'study': [], 'recall': ['hcmp']}
+
+B_rec_vals = np.array([0.3, 0.4, 0.5, 0.6, 0.7])
+nscale_vals = np.array([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
+
+logl_vals = np.zeros((len(B_rec_vals), len(nscale_vals)))
+
+print('running parameter sweep over B_rec and neural_scaling')
+for i in range(len(B_rec_vals)):
+    for j in range(len(nscale_vals)):
+        # set the parameters
+        dnparam.fixed['B_rec'] = B_rec_vals[i]
+        dnparam.fixed['neural_scaling'] = nscale_vals[j]
+        # evaluate likelihood
+        logl, n = model.likelihood(dndf, dnparam,
+                                   patterns=patterns,
+                                   weights=param_sweep.weights,
+                                   data_keys=data_keys)
+        logl_vals[i,j] = logl
+        print('*', end='')
+print('')
+
+width = 10
+precision = 7
+# using python's f-string functionality to display results
+print('Original model: B_rec=0.5, neural_scaling=0.2')
+print(f'Best fitting neurally informed model:\n log-likelihood: {np.max(logl_vals):{width}.{precision}}')
+print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)[0]]}, ', end='')
+print(f'neural_scaling: {nscale_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)[1]]}')
 
 # likelihood for a version of the model where B_rec is not dynamic
-# neurally naive
+# i.e., the generating model had dynamic variability in B_rec, but the evaluating
+# model does not, it is neurally naive
+naiveparam = parameters.Parameters()
+naiveparam.fixed = param_def.fixed.copy()
+naiveparam.weights = param_def.weights.copy()
 
-# Section 6.
-# AIC with correction for finite samples
+naive_logl = np.zeros((len(B_rec_vals)))
+
+print('running parameter sweep over B_rec for neurally naive model')
+for i in range(len(B_rec_vals)):
+    dnparam.fixed['B_rec'] = B_rec_vals[i]
+    logl, n = model.likelihood(dndf, naiveparam,
+                               patterns=patterns,
+                               weights=param_sweep.weights)
+    naive_logl[i] = logl
+
+print('Original model: B_rec=0.5, neural_scaling=0.2')
+print('Evaluating neurally naive model')
+print(f'Best fitting model:\n log-likelihood: {np.max(naive_logl):{width}.{precision}}')
+print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(naive_logl), naive_logl.shape)[0]]}')
+
+# SECTION 6. Model comparison
+# Calculating AIC with correction for finite samples
 # n is number of estimated data points
 # V is number of free param
 # L is log-likelihood
 # 2*L + 2*V + (2*V*(V+1)) / (n-V-1)
+
+def calc_aic(n, V, L):
+    aic = -2*L + 2*V + (2*V*(V+1)) / (n-V-1)
+    return aic
+
+sweep_aic_vals = np.zeros((logl_vals.shape))
+naive_aic_vals = np.zeros((naive_logl.shape))
+for i in range(len(B_rec_vals)):
+    naive_aic_vals[i] = calc_aic(n, 1, naive_logl[i])
+    for j in range(len(nscale_vals)):
+        sweep_aic_vals[i, j] = calc_aic(n, 2, logl_vals[i, j])
+
+best_aic = np.zeros((2,))
+# 0 is naive, 1 is neurally informed
+best_aic[0] = naive_aic_vals[np.unravel_index(np.argmax(naive_logl), naive_logl.shape)[0]]
+best_aic[1] = sweep_aic_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)]
+
+print('AIC score for best-fitting naive model:')
+print(f' AIC: {best_aic[0]:{width}.{precision}}')
+print('AIC score for best-fitting neurally informed model:')
+print(f' AIC: {best_aic[1]:{width}.{precision}}')
+
+# weighted AIC for best-fit naive vs best-fit neural
+temp_waic = np.exp(-0.5 * (best_aic - np.max(best_aic)))
+waic = temp_waic / np.sum(temp_waic)
+print(f'wAIC naive: {waic[0]:{width}.{precision}}, wAIC neural: {waic[1]:{width}.{precision}}')
+
+# check whether n from likelihood function includes termination events
 
 # count up the number of recall events, this is the number of data points
 # we add n_trials because the model counts recall termination as a
 # data point; it tries to predict this just like it tries to
 # predict identity of recalled items
 
-# Section 7. Scramble neural scaling values for a permutation test
+# SECTION 7. Scramble neural scaling values for a permutation test
 
-print('hi')
+# for this exploration of permutation statistics we assume we
+# know the true generating parameters of B_rec and neural_scaling,
+# then we can see how scrambling the neural signal affects the likelihood
+# scores under otherwise perfect conditions
 
+# set this to 100 or more for a more refined p-value
+n_scrambles = 20
+logl_perm = np.zeros((n_scrambles,))
 
+orig_vals = dyn_sim.loc[(dyn_sim.trial_type=='recall'), 'hcmp'].values
 
-##
-# comments to sift through later
-##
+dnparam.fixed['B_rec'] = 0.5
+dnparam.fixed['neural_scaling'] = 0.2
 
-#param_name = ['B_enc', 'B_rec']
-#param_sweep = [np.linspace(0, 1, 5), np.linspace(0, 1, 5)]
+for i in range(n_scrambles):
+    # shuffle around the neural signal and place it back on the dataframe
+    shuffle_inds = np.random.permutation(orig_vals.shape[0])
+    shuf_vals = orig_vals[shuffle_inds]
+    dndf.loc[(dndf.trial_type == 'recall'), 'hcmp'] = shuf_vals
+    # calculate likelihood of data given model with shuffled neural signal
+    logl, n = model.likelihood(dndf, dnparam,
+                               patterns=patterns,
+                               weights=param_sweep.weights,
+                               data_keys=data_keys)
+    logl_perm[i] = logl
+    print('*', end='')
+print('')
 
-# this didn't work, added B_enc and it worked, added issue,
-# seems like parameter_sweep function doesn't work for one param
-#param_name = ['B_rec']
-#param_sweep = [np.linspace(0, 1, 5)]
+# we can get a p-value out of this permutation analysis by
+# comparing the log-likelihood of the model with the unscrambled
+# neural signal, to the distribution of log-likelihoods with
+# different scrambles of the neural signal
 
-# uncomment this to develop
-#results = model.parameter_sweep(synth_study, param, param_name, param_sweep,
-#                                dependent=None, patterns=patterns, weights=weights, n_rep=1)
-#sim = results.groupby(level=[0, 1]).apply(fr.merge_free_recall)
+# The likelihoods with scrambled signal tend to be much worse than for the
+# intact model, so this permutation analysis will likely produce a
+# p-value of zero.  However, if you decide to explore modifications to the
+# tutorial, you may find cases where this final analysis is more informative
 
-#p = sim.groupby(level=[0, 1]).apply(fr.spc)
-#g = fr.plot_spc(p.reset_index(), row=param_names[0], col=param_names[1])
+best_logl = np.max(logl_vals)
+# count up the number of times the scrambled logl value exceeds the
+# original logl value
+pval = np.sum(best_logl < logl_perm) / n_scrambles
 
-print('ho')
+print(f'Best log-likelihood with scrambled neural signal: {np.max(logl_perm):{width}.{precision}}')
+print(f'p-value for neurally informed model against permutation distribution: {pval:{width}.{precision}}')
+
+print('A good place for a final breakpoint.')
 
 
