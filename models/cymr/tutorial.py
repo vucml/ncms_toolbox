@@ -59,14 +59,14 @@ param_def.weights = {'fcf': {'loc': 'w_loc'}}
 # of a to-be-remembered word). The code iterates through these to simulate an experiment.
 # The generate function returns 'sim', a dataframe containing the original study events,
 # and model-generated recall events.
-sim = model.generate(synth_study, param_def, patterns=patterns, weights=param_def.weights)
+sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns=patterns)
 
 # The likelihood function takes a set of study and recall events and determines
 # how likely it is that the model defined by param_def (and the model code) generated
 # that set of recall events.  I.e., what is the likelihood of these data given this model?
 # This is a best-case scenario of sorts, in that the model being evaluated actually
 # literally did generate these data.
-logl, n = model.likelihood(sim, param_def, patterns=patterns, weights=param_def.weights)
+logl, n = model.likelihood(sim, param_def.fixed, param_def=param_def, patterns=patterns)
 
 # This tutorial uses the psifr package to carry out basic behavioral analysis of the
 # free-recall data. The dataframes produced by the models in the cymr package are
@@ -107,9 +107,9 @@ B_rec_vals = np.linspace(0, 1, 11)
 logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
     param_sweep.fixed['B_rec'] = B_rec_vals[i]
-    logl, n = model.likelihood(sim, param_sweep,
-                               patterns=patterns,
-                               weights=param_sweep.weights)
+    logl, n = model.likelihood(sim, param_sweep.fixed,
+                               param_def=param_def,
+                               patterns=patterns)
     logl_vals[i] = logl
     print('*', end='')
 print('')
@@ -160,21 +160,21 @@ param_def.fixed['neural_scaling'] = 0.2
 
 # syntax for 'dynamic' dict structure:
 # {update phase: {param name: string to be evaluated}}
-
-param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
+param_def.set_dynamic('recall', {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'})
+# param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
 
 # now the B_rec parameter will vary from recall event to recall event
 # controlled by the values in the 'hcmp' column of the data structure
 
 # this tells the generate function to preserve the 'hcmp' column on the events dataframe
 # and that the relevant values are the ones defined for recall events
-data_keys = {'recall': ['hcmp']}
+# data_keys = {'recall': ['hcmp']}
+recall_keys = ['hcmp']
 
 # n_rep (number of repetitions) controls how much data is generated, e.g.
 # n_rep=2 tells it to generate 2x as much data as in the dataframe provided
-dyn_sim = model.generate(ndf, param_def, patterns=patterns,
-                         weights=param_def.weights, data_keys=data_keys,
-                         n_rep=1)
+dyn_sim = model.generate(ndf, param_def.fixed, param_def=param_def,
+                         patterns=patterns, recall_keys=recall_keys, n_rep=1)
 
 # dyn_sim is a data structure containing study events and recall events.
 # but the model code doesn't pass the 'hcmp' value back out, so
@@ -231,10 +231,12 @@ plt.savefig('dsh_high_hcmp_crp.pdf')
 # match what was used to create the synthetic data
 
 # 'hcmp' is a recall_key, as described above
-data_keys = {'study': [], 'recall': ['hcmp']}
+recall_keys = ['hcmp']
 
-logl, n = model.likelihood(dyn_sim, param_def, patterns=patterns,
-                           weights=param_def.weights, data_keys=data_keys)
+logl, n = model.likelihood(dyn_sim, param_def.fixed,
+                           param_def=param_def,
+                           patterns=patterns,
+                           recall_keys=recall_keys)
 
 # We used a synthetic neural signal to influence a cognitive process
 # in the CMR model.  Now, we imagine a scenario in which we don't have
@@ -260,12 +262,14 @@ noisy_vals = (hcmp_rec * (1-noise_weight)) + (noise * noise_weight)
 dndf.loc[(dndf.trial_type=='recall'), 'hcmp'] = noisy_vals
 
 # sweep over neural scaling and B_rec base values
-dnparam = parameters.Parameters()
+dnparam = param_def.copy()
+# dnparam = parameters.Parameters()
 # start with the same default parameters we defined in section 1
-dnparam.fixed = param_def.fixed.copy()
-dnparam.weights = param_def.weights.copy()
-dnparam.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
-data_keys = {'study': [], 'recall': ['hcmp']}
+# dnparam.fixed = param_def.fixed.copy()
+# dnparam.weights = param_def.weights.copy()
+# dnparam.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
+dnparam.set_dynamic('recall', {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'})
+recall_keys = ['hcmp']
 
 B_rec_vals = np.array([0.3, 0.4, 0.5, 0.6, 0.7])
 nscale_vals = np.array([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
@@ -279,10 +283,10 @@ for i in range(len(B_rec_vals)):
         dnparam.fixed['B_rec'] = B_rec_vals[i]
         dnparam.fixed['neural_scaling'] = nscale_vals[j]
         # evaluate likelihood
-        logl, n = model.likelihood(dndf, dnparam,
+        logl, n = model.likelihood(dndf, dnparam.fixed,
+                                   param_def=param_def,
                                    patterns=patterns,
-                                   weights=param_sweep.weights,
-                                   data_keys=data_keys)
+                                   recall_keys=recall_keys)
         logl_vals[i,j] = logl
         print('*', end='')
 print('')
@@ -298,6 +302,7 @@ print(f'neural_scaling: {nscale_vals[np.unravel_index(np.argmax(logl_vals), logl
 # likelihood for a version of the model where B_rec is not dynamic
 # i.e., the generating model had dynamic variability in B_rec, but the evaluating
 # model does not, it is neurally naive
+
 naiveparam = parameters.Parameters()
 naiveparam.fixed = param_def.fixed.copy()
 naiveparam.weights = param_def.weights.copy()
@@ -307,9 +312,9 @@ naive_logl = np.zeros((len(B_rec_vals)))
 print('running parameter sweep over B_rec for neurally naive model')
 for i in range(len(B_rec_vals)):
     dnparam.fixed['B_rec'] = B_rec_vals[i]
-    logl, n = model.likelihood(dndf, naiveparam,
-                               patterns=patterns,
-                               weights=param_sweep.weights)
+    logl, n = model.likelihood(dndf, naiveparam.fixed,
+                               param_def=naiveparam,
+                               patterns=patterns)
     naive_logl[i] = logl
 
 print('Original model: B_rec=0.5, neural_scaling=0.2')
@@ -379,10 +384,10 @@ for i in range(n_scrambles):
     shuf_vals = orig_vals[shuffle_inds]
     dndf.loc[(dndf.trial_type == 'recall'), 'hcmp'] = shuf_vals
     # calculate likelihood of data given model with shuffled neural signal
-    logl, n = model.likelihood(dndf, dnparam,
+    logl, n = model.likelihood(dndf, dnparam.fixed,
+                               param_def=dnparam,
                                patterns=patterns,
-                               weights=param_sweep.weights,
-                               data_keys=data_keys)
+                               recall_keys=recall_keys)
     logl_perm[i] = logl
     print('*', end='')
 print('')
