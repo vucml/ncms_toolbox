@@ -13,7 +13,7 @@ import synth_data_convenience as sdc
 
 # SECTION 1.  Setting model parameters and task details
 
-param_def = parameters.Parameters()
+# param_def = parameters.Parameters()
 
 # this helper function creates a set of synthetic patterns corresponding
 # to the pool of potential study items
@@ -31,16 +31,17 @@ model = cmr.CMRDistributed()
 
 # create a parameter definitions object
 param_def = parameters.Parameters()
+param_def.set_sublayers(f=['task'], c=['task'])
+weights = {(('task', 'item'), ('task', 'item')): 'w_loc * loc'}
+param_def.set_weights('fc', weights)
+param_def.set_weights('cf', weights)
 # set the model parameters to reasonable values
 # B_enc: ...
 # B_rec: ...
 # TODO: add documentation explaining what the parameters do
-param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5,
-                   'w_loc': 1, 'P1': 8, 'P2': 1,
-                   'T': 0.35, 'X1': 0.001, 'X2': 0.5,
-                   'Dfc': 3, 'Dcf': 1, 'Dff': 0,
-                   'Lfc': 1, 'Lcf': 1, 'Afc': 0,
-                   'Acf': 0, 'Aff': 0, 'B_start': 0}
+param_def.set_fixed(B_enc=0.7, B_rec=0.5, w_loc=1, P1=8, P2=1,
+                   T=0.35, X1=0.001, X2=0.5, Dfc=3, Dcf=1, Dff=0,
+                   Lfc=1, Lcf=1, Afc=0, Acf=0, Aff=0, B_start=0)
 
 # this weights dictionary is used to specify how to set up the weighted connections
 # between units in the model.  Here, fcf is shorthand for the two weight matrices
@@ -49,7 +50,7 @@ param_def.fixed = {'B_enc': 0.7, 'B_rec': 0.5,
 # context-to-feature projection.
 # 'loc' means we are using localist representations for the studied items, aka
 # orthonormal vectors, aka unit vectors
-param_def.weights = {'fcf': {'loc': 'w_loc'}}
+# param_def.weights = {'fcf': {'loc': 'w_loc'}}
 
 # SECTION 2.  Generating synthetic data and plotting summary
 # statistics from the data
@@ -59,6 +60,7 @@ param_def.weights = {'fcf': {'loc': 'w_loc'}}
 # of a to-be-remembered word). The code iterates through these to simulate an experiment.
 # The generate function returns 'sim', a dataframe containing the original study events,
 # and model-generated recall events.
+# second arg, param_def.fixed or param_def?
 sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns=patterns)
 
 # The likelihood function takes a set of study and recall events and determines
@@ -102,7 +104,7 @@ print('running parameter sweep over B_rec')
 # make a copy of the parameter definitions object
 param_sweep = parameters.Parameters()
 param_sweep.fixed = param_def.fixed.copy()
-param_sweep.weights = param_def.weights.copy()
+# param_sweep.weights = param_def.weights.copy()
 B_rec_vals = np.linspace(0, 1, 11)
 logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
@@ -306,12 +308,15 @@ print(f'neural_scaling: {nscale_vals[np.unravel_index(np.argmax(logl_vals), logl
 naiveparam = parameters.Parameters()
 naiveparam.fixed = param_def.fixed.copy()
 naiveparam.weights = param_def.weights.copy()
+naiveparam.sublayers = param_def.sublayers.copy()
+# this isn't strictly necessary as naiveparam doesn't have a dynamic param field to actually make use of neural_scaling
+naiveparam.fixed['neural_scaling'] = 0
 
 naive_logl = np.zeros((len(B_rec_vals)))
 
 print('running parameter sweep over B_rec for neurally naive model')
 for i in range(len(B_rec_vals)):
-    dnparam.fixed['B_rec'] = B_rec_vals[i]
+    naiveparam.fixed['B_rec'] = B_rec_vals[i]
     logl, n = model.likelihood(dndf, naiveparam.fixed,
                                param_def=naiveparam,
                                patterns=patterns)
