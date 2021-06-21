@@ -16,7 +16,7 @@ Certain Python analysis relies on the psifr toolbox, also hosted on GitHub: mort
 
 ## Models: cymr
 * Neal Morton developed a Python version of CMR hosted on GitHub at mortonne/cymr. The cymr directory in this project contains code that is designed to work with cymr. (So you'll need to install cymr to get it to work!)
-* Of special note is the tutorial.py file, which was written to accompany a chapter in the upcoming edition of Model-Based Cognitive Neuroscience edited by Brandon Turner & Birte Forstmann.
+* Polyn (2021) Assessing neurocognitive hypotheses in a likelihood-based model of the free-recall task. In: Model-Based Cognitive Neuroscience, edited by Brandon Turner & Birte Forstmann. In ncms_toolbox > cymr you'll find tutorial code: KragEtal15_tutorial.py, which was written to accompany the chapter. Check the README in that directory for more details.
 
 ## References
 * Kragel, J. E., Morton, N. W, and Polyn, S. M. (2015) Neural activity in the medial temporal lobe reveals the fidelity of mental time travel. Journal of Neuroscience, 35 (7), 2914-2926.
