@@ -11,6 +11,10 @@ from cymr import network
 
 import synth_data_convenience as sdc
 
+# setting the path for where you want to save figures
+# change this to be a folder on your computer
+figpath = '/Users/polyn/computing/KragEtal15_tutorial/'
+
 # SECTION 1.  Setting model parameters and task details
 
 # param_def = parameters.Parameters()
@@ -83,14 +87,14 @@ sim_merged = fr.merge_free_recall(sim)
 # plot a serial position curve, and save it to disk
 rec_pos = fr.spc(sim_merged)
 g = fr.plot_spc(rec_pos)
-plt.savefig('temp_spc.pdf')
+plt.savefig(figpath+'temp_spc.pdf')
 
 # calculate likelihood of a recall transition of a particular lag-distance
 # plot a lag-CRP curve, and save it to disk
 crp = fr.lag_crp(sim_merged)
 g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
-plt.savefig('temp_crp.pdf')
+plt.savefig(figpath+'temp_crp.pdf')
 
 
 # SECTION 3. Using predictive simulations to perform parameter recovery.
@@ -123,7 +127,7 @@ plt.plot(B_rec_vals, logl_vals)
 plt.plot([0.5, 0.5], [plt.ylim()[0], plt.ylim()[1]])
 plt.xlabel('beta rec value')
 plt.ylabel('log likelihood')
-plt.savefig('B_rec_recovery.pdf')
+plt.savefig(figpath+'B_rec_recovery.pdf')
 
 # SECTION 4. Creating synthetic neural data and creating a neural linking parameter
 # that allows the neural data to control the model's temporal context reinstatement
@@ -205,7 +209,7 @@ print('running lag-CRP analyses')
 crp = fr.lag_crp(dsh_merged)
 g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
-plt.savefig('dsh_overall_crp.pdf')
+plt.savefig(figpath+'dsh_overall_crp.pdf')
 
 # Here we conditionalize the lag-CRP to filter recall transitions based on the
 # value of 'hcmp'. We define a test function using the lambda keyword.  Here,
@@ -216,14 +220,14 @@ plt.savefig('dsh_overall_crp.pdf')
 lo_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
 g = fr.plot_lag_crp(lo_crp)
 g.set(ylim=(0, .6))
-plt.savefig('dsh_low_hcmp_crp.pdf')
+plt.savefig(figpath+'dsh_low_hcmp_crp.pdf')
 
 # this just changes the test to only include transitions where the 'from' item
 # has a high value of hcmp / temporal reinstatement.
 hi_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
 g = fr.plot_lag_crp(hi_crp)
 g.set(ylim=(0, .6))
-plt.savefig('dsh_high_hcmp_crp.pdf')
+plt.savefig(figpath+'dsh_high_hcmp_crp.pdf')
 
 
 # SECTION 5. Running predictive simulations given the data created by the
