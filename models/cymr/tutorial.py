@@ -26,8 +26,8 @@ n_trials = 6
 list_len = 24
 synth_study = sdc.create_expt(patterns, n_subj, n_trials, list_len)
 
-# create the model using the CMR-Distributed module
-model = cmr.CMRDistributed()
+# create the model using the CMR module
+model = cmr.CMR()
 
 # create a parameter definitions object
 param_def = parameters.Parameters()
