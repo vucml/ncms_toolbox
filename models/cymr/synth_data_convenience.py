@@ -72,5 +72,3 @@ def create_list(patterns, subjid, trialnum, list_len, dummy_recalls):
     return trial_frame
 
 
-#this = create_expt(2,3,5)
-#this

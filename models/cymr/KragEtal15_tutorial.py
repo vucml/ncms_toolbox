@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import seaborn as sns
 
 from psifr import fr
@@ -40,12 +41,28 @@ weights = {(('task', 'item'), ('task', 'item')): 'w_loc * loc'}
 param_def.set_weights('fc', weights)
 param_def.set_weights('cf', weights)
 # set the model parameters to reasonable values
-# B_enc: ...
-# B_rec: ...
-# TODO: add documentation explaining what the parameters do
-param_def.set_fixed(B_enc=0.7, B_rec=0.5, w_loc=1, P1=8, P2=1,
-                   T=0.35, X1=0.001, X2=0.5, Dfc=3, Dcf=1, Dff=0,
-                   Lfc=1, Lcf=1, Afc=0, Acf=0, Aff=0, B_start=0)
+# B_enc: contextual integration rate for study items (enc: encoding)
+# B_rec: contextual integration rate for recalled items
+# w_loc: weight for the localist component of context (it is the only component of context)
+# P1: primacy parameter controlling learning rate advantage for first item
+# P2: primacy parameter controlling decay rate of learning rate advantage over subsequent items
+# T: tau parameter controlling exponentiation of item support values during recall competition
+# X1: recall termination parameter, probability that recall will terminate at first output position
+# X2: recall termination parameter, controls exponential increase in recall termination prob over output positions
+# Lfc: Hebbian learning rate for feature-to-context associations
+# Lcf: Hebbian learning rate for context-to-feature associations 
+# B_start: contextual integration rate for retrieval of start-of-list context when memory search initiates 
+param_def.set_fixed(B_enc=0.7, 
+                    B_rec=0.5, 
+                    w_loc=1, 
+                    P1=15, 
+                    P2=2,
+                    T=0.25, 
+                    X1=0.001, 
+                    X2=0.5, 
+                    Lfc=0.15, 
+                    Lcf=0.85, 
+                    B_start=0)
 
 # this weights dictionary is used to specify how to set up the weighted connections
 # between units in the model.  Here, fcf is shorthand for the two weight matrices
@@ -87,14 +104,16 @@ sim_merged = fr.merge_free_recall(sim)
 # plot a serial position curve, and save it to disk
 rec_pos = fr.spc(sim_merged)
 g = fr.plot_spc(rec_pos)
-plt.savefig(figpath+'temp_spc.pdf')
+g.ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.savefig(figpath+'spc.pdf', bbox_inches='tight')
 
 # calculate likelihood of a recall transition of a particular lag-distance
 # plot a lag-CRP curve, and save it to disk
 crp = fr.lag_crp(sim_merged)
 g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
-plt.savefig(figpath+'temp_crp.pdf')
+g.ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.savefig(figpath+'crp.pdf', bbox_inches='tight')
 
 
 # SECTION 3. Using predictive simulations to perform parameter recovery.
@@ -152,7 +171,7 @@ ndf.loc[(ndf.trial_type=='recall'), 'hcmp'] = signal
 
 # we will use param_def from above, but make some modifications
 # we add a neural scaling parameter
-param_def.fixed['neural_scaling'] = 0.2
+param_def.fixed['neural_scaling'] = 0.1
 
 # then we define a dynamic parameter
 
@@ -300,7 +319,7 @@ print('')
 width = 10
 precision = 7
 # using python's f-string functionality to display results
-print('Original model: B_rec=0.5, neural_scaling=0.2')
+print(f"Original model: B_rec={param_def.fixed['B_rec']}, neural_scaling={param_def.fixed['neural_scaling']}")
 print(f'Best fitting neurally informed model:\n log-likelihood: {np.max(logl_vals):{width}.{precision}}')
 print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)[0]]}, ', end='')
 print(f'neural_scaling: {nscale_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)[1]]}')
@@ -326,7 +345,7 @@ for i in range(len(B_rec_vals)):
                                patterns=patterns)
     naive_logl[i] = logl
 
-print('Original model: B_rec=0.5, neural_scaling=0.2')
+print(f"Original model: B_rec={param_def.fixed['B_rec']}, neural_scaling={param_def.fixed['neural_scaling']}")
 print('Evaluating neurally naive model')
 print(f'Best fitting model:\n log-likelihood: {np.max(naive_logl):{width}.{precision}}')
 print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(naive_logl), naive_logl.shape)[0]]}')
