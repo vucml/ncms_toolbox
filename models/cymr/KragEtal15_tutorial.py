@@ -10,7 +10,7 @@ from cymr import cmr
 from cymr import parameters
 from cymr import network
 
-import synth_data_convenience as sdc
+import tutorial_helpers as th
 
 # setting the path for where you want to save figures
 # change this to be a folder on your computer
@@ -22,14 +22,14 @@ figpath = '/Users/polyn/computing/KragEtal15_tutorial/'
 
 # this helper function creates a set of synthetic patterns corresponding
 # to the pool of potential study items
-patterns = sdc.create_patterns(24)
+patterns = th.create_patterns(24)
 
 # this helper function creates a pandas dataframe describing a set of synthetic study events,
 # these will be used to guide a simulation that will generate synthetic recall sequences
 n_subj = 20
 n_trials = 6
 list_len = 24
-synth_study = sdc.create_expt(patterns, n_subj, n_trials, list_len)
+synth_study = th.create_expt(patterns, n_subj, n_trials, list_len)
 
 # create the model using the CMR module
 model = cmr.CMR()
@@ -55,13 +55,13 @@ param_def.set_weights('cf', weights)
 param_def.set_fixed(B_enc=0.7, 
                     B_rec=0.5, 
                     w_loc=1, 
-                    P1=15, 
-                    P2=2,
-                    T=0.25, 
+                    P1=8, 
+                    P2=1,
+                    T=0.35, 
                     X1=0.001, 
                     X2=0.5, 
-                    Lfc=0.15, 
-                    Lcf=0.85, 
+                    Lfc=0.3, 
+                    Lcf=1,  
                     B_start=0)
 
 # this weights dictionary is used to specify how to set up the weighted connections
@@ -81,7 +81,6 @@ param_def.set_fixed(B_enc=0.7,
 # of a to-be-remembered word). The code iterates through these to simulate an experiment.
 # The generate function returns 'sim', a dataframe containing the original study events,
 # and model-generated recall events.
-# second arg, param_def.fixed or param_def?
 sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns=patterns)
 
 # The likelihood function takes a set of study and recall events and determines
@@ -101,7 +100,7 @@ logl, n = model.likelihood(sim, param_def.fixed, param_def=param_def, patterns=p
 sim_merged = fr.merge_free_recall(sim)
 
 # calculate probability of recall as a function of serial position
-# plot a serial position curve, and save it to disk
+# plot a serial position curve using psifr, seaborn, and matplotlib, and save it to disk
 rec_pos = fr.spc(sim_merged)
 g = fr.plot_spc(rec_pos)
 g.ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -127,7 +126,7 @@ print('running parameter sweep over B_rec')
 # make a copy of the parameter definitions object
 param_sweep = parameters.Parameters()
 param_sweep.fixed = param_def.fixed.copy()
-# param_sweep.weights = param_def.weights.copy()
+
 B_rec_vals = np.linspace(0, 1, 11)
 logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
@@ -143,10 +142,12 @@ print('')
 # has a B_rec parameter value that matches B_rec of the generating model
 plt.clf()
 plt.plot(B_rec_vals, logl_vals)
-plt.plot([0.5, 0.5], [plt.ylim()[0], plt.ylim()[1]])
-plt.xlabel('beta rec value')
+bottom, top = plt.ylim()
+plt.plot([0.5, 0.5], [bottom, top], linestyle='dashed')
+plt.ylim(bottom, top)
+plt.xlabel(r'$\beta_{rec}$ value')
 plt.ylabel('log likelihood')
-plt.savefig(figpath+'B_rec_recovery.pdf')
+plt.savefig(figpath+'B_rec_recovery.pdf', bbox_inches='tight')
 
 # SECTION 4. Creating synthetic neural data and creating a neural linking parameter
 # that allows the neural data to control the model's temporal context reinstatement
@@ -159,7 +160,7 @@ plt.savefig(figpath+'B_rec_recovery.pdf')
 # synthetic neural signal for each dummy recall event, then our generative simulation will
 # use these synthetic neural signals during recall-sequence generation.
 # ndf = 'neural data frame'
-ndf = sdc.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
+ndf = th.create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=True)
 
 # we create a column on the dataframe called 'hcmp' (short for hippocampus)
 ndf = ndf.assign(hcmp=np.nan)
@@ -169,51 +170,38 @@ these_entries = ndf.loc[(ndf.trial_type=='recall'), 'hcmp']
 signal = np.random.randn(these_entries.shape[0])
 ndf.loc[(ndf.trial_type=='recall'), 'hcmp'] = signal
 
-# we will use param_def from above, but make some modifications
+# we use param_def from above, but make some modifications
 # we add a neural scaling parameter
-param_def.fixed['neural_scaling'] = 0.1
+param_def.fixed['neural_scaling'] = 0.2
 
-# then we define a dynamic parameter
-
-# the 'recall' key specifies that this dynamic parameter changes with each
-# recall event.  The 'B_rec' key specifies which parameter will be updated.
-# The set_dynamic_param code will evaluate the string, using the numpy
-# namespace and the namespace of the parameters defined in param_def.fixed.
-# The stochastic hcmp values are scaled and added to B_rec, and the resultant
-# value is bounded at 0 and 1 (because the B_rec parameter is limited to this
-# range).
+# Then we define a dynamic parameter:
 
 # syntax for 'dynamic' dict structure:
 # {update phase: {param name: string to be evaluated}}
+
+# The 'recall' key specifies that this dynamic parameter changes with each recall event.  
+# The 'B_rec' key specifies which parameter will be updated.
+# The set_dynamic function evaluates the string following 'B_rec', using the numpy
+# namespace and the namespace of the parameters defined in param_def.fixed.
+# The stochastic hcmp values are scaled and added to B_rec, and 'clip' 
+# bounds B_rec at 0 and 1 (because the B_rec parameter is limited to this range).
+
 param_def.set_dynamic('recall', {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'})
-# param_def.dynamic = {'recall': {'B_rec': 'clip(B_rec + hcmp * neural_scaling, 0, 1)'}}
 
-# now the B_rec parameter will vary from recall event to recall event
-# controlled by the values in the 'hcmp' column of the data structure
-
-# this tells the generate function to preserve the 'hcmp' column on the events dataframe
-# and that the relevant values are the ones defined for recall events
+# recall_keys tells the generate function to preserve the 'hcmp' column on the events dataframe
+# and that the relevant values of 'hcmp' are the ones defined for recall events
 # data_keys = {'recall': ['hcmp']}
 recall_keys = ['hcmp']
 
 # n_rep (number of repetitions) controls how much data is generated, e.g.
 # n_rep=2 tells it to generate 2x as much data as in the dataframe provided
 dyn_sim = model.generate(ndf, param_def.fixed, param_def=param_def,
-                         patterns=patterns, recall_keys=recall_keys, n_rep=1)
+                         patterns=patterns, recall_keys=recall_keys, n_rep=2)
 
 # dyn_sim is a data structure containing study events and recall events.
 # but the model code doesn't pass the 'hcmp' value back out, so
 # we will have to copy it over from the ndf dataframe
-
-# to identify a recall event, subject, list, trial_type, position
-for index, row in ndf.iterrows():
-    if row.trial_type == 'recall':
-        # find the corresponding row or rows in dyn_sim (rows if n_rep > 1)
-        mask = (dyn_sim.subject==row.subject) & \
-               (dyn_sim.list==row.list) & \
-               (dyn_sim.position==row.position) & \
-               (dyn_sim.trial_type=='recall')
-        dyn_sim.loc[mask, 'hcmp'] = row.hcmp
+dyn_sim = th.fix_hcmp_field(ndf, dyn_sim)
 
 # demonstrate how lag-CRP is different for recall events with
 # low vs high temporal reinstatement
@@ -228,25 +216,15 @@ print('running lag-CRP analyses')
 crp = fr.lag_crp(dsh_merged)
 g = fr.plot_lag_crp(crp)
 g.set(ylim=(0, .6))
-plt.savefig(figpath+'dsh_overall_crp.pdf')
+plt.savefig(figpath+'dsh_overall_crp.pdf', bbox_inches='tight')
 
-# Here we conditionalize the lag-CRP to filter recall transitions based on the
-# value of 'hcmp'. We define a test function using the lambda keyword.  Here,
-# x and y correspond to the identities of the 2 items being transitioned between.
+# The plot_var_crp function conditionalizes the lag-CRP to filter recall transitions 
+# based on the value of 'hcmp'. 
 # Every transition has an item you are coming from (x) and an item you are going
-# to (y). The (x < -0.5) statement will cause the analysis to only include
-# transitions where the 'from' item has a low value for hcmp / temporal reinstatement.
-lo_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
-g = fr.plot_lag_crp(lo_crp)
-g.set(ylim=(0, .6))
-plt.savefig(figpath+'dsh_low_hcmp_crp.pdf')
-
-# this just changes the test to only include transitions where the 'from' item
-# has a high value of hcmp / temporal reinstatement.
-hi_crp = fr.lag_crp(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
-g = fr.plot_lag_crp(hi_crp)
-g.set(ylim=(0, .6))
-plt.savefig(figpath+'dsh_high_hcmp_crp.pdf')
+# to (y). For low-temporal-reinstatement transitions there is a statement (x < -0.5) 
+# which causes the analysis to only include transitions where the 'from' item has a low 
+# value for hcmp / temporal reinstatement.
+th.plot_var_crp(dsh_merged, figpath)
 
 
 # SECTION 5. Running predictive simulations given the data created by the
@@ -318,7 +296,7 @@ print('')
 
 width = 10
 precision = 7
-# using python's f-string functionality to display results
+# using python formatted strings to print results
 print(f"Original model: B_rec={param_def.fixed['B_rec']}, neural_scaling={param_def.fixed['neural_scaling']}")
 print(f'Best fitting neurally informed model:\n log-likelihood: {np.max(logl_vals):{width}.{precision}}')
 print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(logl_vals), logl_vals.shape)[0]]}, ', end='')
@@ -352,21 +330,17 @@ print(f' B_rec: {B_rec_vals[np.unravel_index(np.argmax(naive_logl), naive_logl.s
 
 # SECTION 6. Model comparison
 # Calculating AIC with correction for finite samples
+# syntax: calc_aic(n, V, L)
 # n is number of estimated data points
 # V is number of free param
 # L is log-likelihood
-# 2*L + 2*V + (2*V*(V+1)) / (n-V-1)
-
-def calc_aic(n, V, L):
-    aic = -2*L + 2*V + (2*V*(V+1)) / (n-V-1)
-    return aic
 
 sweep_aic_vals = np.zeros((logl_vals.shape))
 naive_aic_vals = np.zeros((naive_logl.shape))
 for i in range(len(B_rec_vals)):
-    naive_aic_vals[i] = calc_aic(n, 1, naive_logl[i])
+    naive_aic_vals[i] = th.calc_aic(n, 1, naive_logl[i])
     for j in range(len(nscale_vals)):
-        sweep_aic_vals[i, j] = calc_aic(n, 2, logl_vals[i, j])
+        sweep_aic_vals[i, j] = th.calc_aic(n, 2, logl_vals[i, j])
 
 best_aic = np.zeros((2,))
 # 0 is naive, 1 is neurally informed
