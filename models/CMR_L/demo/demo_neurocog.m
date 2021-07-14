@@ -6,7 +6,7 @@
 % set the seed for random number generation
 % uncomment if you want it to always turn out the same way
 % comment if you want it to vary from run to run
-rng(42)
+% rng(42)
 
 % This tutorial provides a demonstration of predictive and
 % generative modeling with the Context Maintenance and Retrieval (CMR)
@@ -164,7 +164,7 @@ end
 % truncated at 0 and 1 
 base_B_rec = 0.5;
 % can alter this
-neural_signal_strength = 0.1;
+neural_signal_strength = 0.2;
 synth_neural_fluct = randn(n_trials, max_recalls) * neural_signal_strength;
 var_B_rec = base_B_rec + synth_neural_fluct;
 var_B_rec(var_B_rec<0) = 0;
@@ -196,13 +196,23 @@ hi_B_rec_mask = var_B_rec > 0.5;
 % lag-CRP using a 'from_rec_mask' 
 % each recall transition is from one item and to another, this mask
 % is applied on the 'from' side
+%lo_lc = crp(var_data.recalls, ...
+%            var_data.subject, ...
+%            LL, lo_B_rec_mask);
+
+%hi_lc = crp(var_data.recalls, ...
+%            var_data.subject, ...
+%            LL, hi_B_rec_mask);
+
 lo_lc = crp(var_data.recalls, ...
             var_data.subject, ...
-            LL, lo_B_rec_mask);
+            LL, lo_B_rec_mask, ...
+            make_clean_recalls_mask2d(var_data.recalls));
 
 hi_lc = crp(var_data.recalls, ...
             var_data.subject, ...
-            LL, hi_B_rec_mask);
+            LL, hi_B_rec_mask, ...
+            make_clean_recalls_mask2d(var_data.recalls));
 
 figure(4); clf;
 plot([-5:5],lo_lc(:,LL-5:LL+5),'ko-')

@@ -12,6 +12,10 @@ from cymr import network
 
 import tutorial_helpers as th
 
+#from numpy.random import Generator, PCG64
+#rng = Generator(PCG64(seed=42))
+rng = np.random.default_rng()
+
 # setting the path for where you want to save figures
 # change this to be a folder on your computer
 figpath = '/Users/polyn/computing/KragEtal15_tutorial/'
@@ -37,9 +41,10 @@ model = cmr.CMR()
 # create a parameter definitions object
 param_def = parameters.Parameters()
 param_def.set_sublayers(f=['task'], c=['task'])
-weights = {(('task', 'item'), ('task', 'item')): 'w_loc * loc'}
-param_def.set_weights('fc', weights)
-param_def.set_weights('cf', weights)
+fc_weights = {(('task', 'item'), ('task', 'item')): 'Dfc * w_loc * loc'}
+cf_weights = {(('task', 'item'), ('task', 'item')): 'Dcf * w_loc * loc'}
+param_def.set_weights('fc', fc_weights)
+param_def.set_weights('cf', cf_weights)
 # set the model parameters to reasonable values
 # B_enc: contextual integration rate for study items (enc: encoding)
 # B_rec: contextual integration rate for recalled items
@@ -55,14 +60,20 @@ param_def.set_weights('cf', weights)
 param_def.set_fixed(B_enc=0.7, 
                     B_rec=0.5, 
                     w_loc=1, 
-                    P1=8, 
-                    P2=1,
+                    P1=8.0, 
+                    P2=1.0,
                     T=0.35, 
                     X1=0.001, 
                     X2=0.5, 
-                    Lfc=0.3, 
-                    Lcf=1,  
+                    Lfc=1,
+                    Lcf=1,
+                    Dfc=3,
+                    Dcf=1,
                     B_start=0)
+
+# these parameters will get used later
+neural_scaling = 0.15
+orig_B_rec = param_def.fixed['B_rec']
 
 # this weights dictionary is used to specify how to set up the weighted connections
 # between units in the model.  Here, fcf is shorthand for the two weight matrices
@@ -81,7 +92,7 @@ param_def.set_fixed(B_enc=0.7,
 # of a to-be-remembered word). The code iterates through these to simulate an experiment.
 # The generate function returns 'sim', a dataframe containing the original study events,
 # and model-generated recall events.
-sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns=patterns)
+sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns=patterns, n_rep=2)
 
 # The likelihood function takes a set of study and recall events and determines
 # how likely it is that the model defined by param_def (and the model code) generated
@@ -167,12 +178,15 @@ ndf = ndf.assign(hcmp=np.nan)
 these_entries = ndf.loc[(ndf.trial_type=='recall'), 'hcmp']
 # We simulate the neural signal as a stochastic process producing values
 # drawn from a normal distribution with mean = 0 and stdev = 1.
-signal = np.random.randn(these_entries.shape[0])
+
+#signal = np.random.randn(these_entries.shape[0])
+signal = rng.standard_normal(size=these_entries.shape[0])
+
 ndf.loc[(ndf.trial_type=='recall'), 'hcmp'] = signal
 
 # we use param_def from above, but make some modifications
 # we add a neural scaling parameter
-param_def.fixed['neural_scaling'] = 0.2
+param_def.fixed['neural_scaling'] = neural_scaling
 
 # Then we define a dynamic parameter:
 
@@ -196,7 +210,7 @@ recall_keys = ['hcmp']
 # n_rep (number of repetitions) controls how much data is generated, e.g.
 # n_rep=2 tells it to generate 2x as much data as in the dataframe provided
 dyn_sim = model.generate(ndf, param_def.fixed, param_def=param_def,
-                         patterns=patterns, recall_keys=recall_keys, n_rep=2)
+                         patterns=patterns, recall_keys=recall_keys, n_rep=1)
 
 # dyn_sim is a data structure containing study events and recall events.
 # but the model code doesn't pass the 'hcmp' value back out, so
@@ -226,6 +240,9 @@ plt.savefig(figpath+'dsh_overall_crp.pdf', bbox_inches='tight')
 # value for hcmp / temporal reinstatement.
 th.plot_var_crp(dsh_merged, figpath)
 
+tf_all = fr.lag_rank(dsh_merged)
+tf_lo = fr.lag_rank(dsh_merged, test_key='hcmp', test=lambda x, y: x < -0.5)
+tf_hi = fr.lag_rank(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
 
 # SECTION 5. Running predictive simulations given the data created by the
 # model with temporal reinstatement (B_rec) that varies across recall events.
@@ -260,7 +277,10 @@ dndf = dyn_sim.copy()
 noise_weight = 0.5
 
 hcmp_rec = dyn_sim.loc[(dyn_sim.trial_type=='recall'), 'hcmp']
-noise = np.random.randn(hcmp_rec.shape[0])
+
+#noise = np.random.randn(hcmp_rec.shape[0])
+noise = rng.standard_normal(size=hcmp_rec.shape[0])
+
 noisy_vals = (hcmp_rec * (1-noise_weight)) + (noise * noise_weight)
 dndf.loc[(dndf.trial_type=='recall'), 'hcmp'] = noisy_vals
 
@@ -377,12 +397,13 @@ logl_perm = np.zeros((n_scrambles,))
 
 orig_vals = dyn_sim.loc[(dyn_sim.trial_type=='recall'), 'hcmp'].values
 
-dnparam.fixed['B_rec'] = 0.5
-dnparam.fixed['neural_scaling'] = 0.2
+dnparam.fixed['B_rec'] = orig_B_rec
+dnparam.fixed['neural_scaling'] = neural_scaling
 
 for i in range(n_scrambles):
     # shuffle around the neural signal and place it back on the dataframe
-    shuffle_inds = np.random.permutation(orig_vals.shape[0])
+    #shuffle_inds = np.random.permutation(orig_vals.shape[0])
+    shuffle_inds = rng.permutation(orig_vals.shape[0])
     shuf_vals = orig_vals[shuffle_inds]
     dndf.loc[(dndf.trial_type == 'recall'), 'hcmp'] = shuf_vals
     # calculate likelihood of data given model with shuffled neural signal
