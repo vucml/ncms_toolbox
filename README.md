@@ -19,7 +19,7 @@ Certain Python analysis relies on the psifr toolbox, also hosted on GitHub: mort
 * The cymr directory in ncms_toolbox contains code that is designed to work with cymr. You'll need to install cymr to get it to work. Check the cymr page for detailed installation instructions.
 * There are two tutorial files here: <code> KragEtal15_tutorial.py </code> and <code> synth_data_convenience.py </code>. These are companion code for a chapter:
 * Polyn (2021) Assessing neurocognitive hypotheses in a likelihood-based model of the free-recall task. In: Model-Based Cognitive Neuroscience, edited by Brandon Turner & Birte Forstmann. 
-* Check the README in the ncms_toolbox/cymr directory for more details.
+* Check the README in the ncms_toolbox/models/cymr directory for more details.
 
 ## References
 * Kragel, J. E., Morton, N. W, and Polyn, S. M. (2015) Neural activity in the medial temporal lobe reveals the fidelity of mental time travel. Journal of Neuroscience, 35 (7), 2914-2926.
