@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-import seaborn as sns
+#import seaborn as sns
 
 from psifr import fr
 from cymr import cmr
@@ -18,7 +18,7 @@ rng = np.random.default_rng()
 
 # setting the path for where you want to save figures
 # change this to be a folder on your computer
-figpath = '/Users/polyn/computing/KragEtal15_tutorial/'
+figpath = 'c:/Users/polynsm/modelsmemory312/Krag_tutorial/'
 
 # SECTION 1.  Setting model parameters and task details
 
@@ -39,7 +39,7 @@ synth_study = th.create_expt(patterns, n_subj, n_trials, list_len)
 model = cmr.CMR()
 
 # create a parameter definitions object
-param_def = parameters.Parameters()
+param_def = cmr.CMRParameters()
 param_def.set_sublayers(f=['task'], c=['task'])
 fc_weights = {(('task', 'item'), ('task', 'item')): 'Dfc * w_loc * loc'}
 cf_weights = {(('task', 'item'), ('task', 'item')): 'Dcf * w_loc * loc'}
@@ -99,7 +99,7 @@ sim = model.generate(synth_study, param_def.fixed, param_def=param_def, patterns
 # that set of recall events.  I.e., what is the likelihood of these data given this model?
 # This is a best-case scenario of sorts, in that the model being evaluated actually
 # literally did generate these data.
-logl, n = model.likelihood(sim, param_def.fixed, param_def=param_def, patterns=patterns)
+results = model.likelihood(sim, param_def.fixed, param_def=param_def, patterns=patterns)
 
 # This tutorial uses the psifr package to carry out basic behavioral analysis of the
 # free-recall data. The dataframes produced by the models in the cymr package are
@@ -142,10 +142,10 @@ B_rec_vals = np.linspace(0, 1, 11)
 logl_vals = np.zeros((len(B_rec_vals),), dtype=float)
 for i in range(len(B_rec_vals)):
     param_sweep.fixed['B_rec'] = B_rec_vals[i]
-    logl, n = model.likelihood(sim, param_sweep.fixed,
+    results = model.likelihood(sim, param_sweep.fixed,
                                param_def=param_def,
                                patterns=patterns)
-    logl_vals[i] = logl
+    logl_vals[i] = np.sum(results['logl'])
     print('*', end='')
 print('')
 
@@ -253,7 +253,7 @@ tf_hi = fr.lag_rank(dsh_merged, test_key='hcmp', test=lambda x, y: x > 0.5)
 # 'hcmp' is a recall_key, as described above
 recall_keys = ['hcmp']
 
-logl, n = model.likelihood(dyn_sim, param_def.fixed,
+results = model.likelihood(dyn_sim, param_def.fixed,
                            param_def=param_def,
                            patterns=patterns,
                            recall_keys=recall_keys)
@@ -306,11 +306,11 @@ for i in range(len(B_rec_vals)):
         dnparam.fixed['B_rec'] = B_rec_vals[i]
         dnparam.fixed['neural_scaling'] = nscale_vals[j]
         # evaluate likelihood
-        logl, n = model.likelihood(dndf, dnparam.fixed,
+        results = model.likelihood(dndf, dnparam.fixed,
                                    param_def=param_def,
                                    patterns=patterns,
                                    recall_keys=recall_keys)
-        logl_vals[i,j] = logl
+        logl_vals[i,j] = np.sum(results['logl'])
         print('*', end='')
 print('')
 
@@ -326,7 +326,7 @@ print(f'neural_scaling: {nscale_vals[np.unravel_index(np.argmax(logl_vals), logl
 # i.e., the generating model had dynamic variability in B_rec, but the evaluating
 # model does not, it is neurally naive
 
-naiveparam = parameters.Parameters()
+naiveparam = cmr.CMRParameters()
 naiveparam.fixed = param_def.fixed.copy()
 naiveparam.weights = param_def.weights.copy()
 naiveparam.sublayers = param_def.sublayers.copy()
@@ -338,10 +338,11 @@ naive_logl = np.zeros((len(B_rec_vals)))
 print('running parameter sweep over B_rec for neurally naive model')
 for i in range(len(B_rec_vals)):
     naiveparam.fixed['B_rec'] = B_rec_vals[i]
-    logl, n = model.likelihood(dndf, naiveparam.fixed,
+    results = model.likelihood(dndf, naiveparam.fixed,
                                param_def=naiveparam,
                                patterns=patterns)
-    naive_logl[i] = logl
+    naive_logl[i] = np.sum(results['logl'])
+    n = np.sum(results['n'])
 
 print(f"Original model: B_rec={param_def.fixed['B_rec']}, neural_scaling={param_def.fixed['neural_scaling']}")
 print('Evaluating neurally naive model')
@@ -407,11 +408,11 @@ for i in range(n_scrambles):
     shuf_vals = orig_vals[shuffle_inds]
     dndf.loc[(dndf.trial_type == 'recall'), 'hcmp'] = shuf_vals
     # calculate likelihood of data given model with shuffled neural signal
-    logl, n = model.likelihood(dndf, dnparam.fixed,
+    results = model.likelihood(dndf, dnparam.fixed,
                                param_def=dnparam,
                                patterns=patterns,
                                recall_keys=recall_keys)
-    logl_perm[i] = logl
+    logl_perm[i] = np.sum(results['logl'])
     print('*', end='')
 print('')
 

@@ -27,7 +27,8 @@ def create_expt(patterns, n_subj, n_trials, list_len, dummy_recalls=False):
         if i==0:
             expt_frame = sess_frame.copy()
         else:
-            expt_frame = expt_frame.append(sess_frame)
+            expt_frame = pd.concat([expt_frame, sess_frame], ignore_index=True)
+            
     return expt_frame
 
 def create_session(patterns, subjid, n_trials, list_len, dummy_recalls):
@@ -36,7 +37,8 @@ def create_session(patterns, subjid, n_trials, list_len, dummy_recalls):
         if i==0:
             sess_frame = trial_frame.copy()
         else:
-            sess_frame = sess_frame.append(trial_frame)
+            #sess_frame = sess_frame.append(trial_frame)
+            sess_frame = pd.concat([sess_frame, trial_frame], ignore_index=True)
     return sess_frame
 
 
@@ -68,7 +70,8 @@ def create_list(patterns, subjid, trialnum, list_len, dummy_recalls):
             'item_index': indices,
             'item': item_names
         })
-        trial_frame = study_frame.append(recall_frame)
+        #trial_frame = study_frame.append(recall_frame)
+        trial_frame = pd.concat([study_frame, recall_frame], ignore_index=True)
     else:
         trial_frame = study_frame
 
